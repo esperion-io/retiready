@@ -44,7 +44,6 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                 </TouchableOpacity>
                 <View>
                     <Text style={styles.headerTitle}>Living Options</Text>
-                    <Text style={styles.headerSubtitle}>Choose your ideal home</Text>
                 </View>
                 <View style={{ width: 24 }} />
             </View>

@@ -1,38 +1,59 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CostItem, useCalculator } from '../../../context/CalculatorContext';
 import { useToast } from '../../../context/ToastContext';
-import { Tooltip } from '../../ui/Tooltip';
 
 interface CostsStepProps {
     onNext: () => void;
     onBack: () => void;
 }
 
-type TabType = 'current' | 'savings';
-
-const TOP_7_CURRENT = ['Groceries', 'Power / Gas', 'Rates', 'House Insurance', 'Vehicle Expenses', 'Internet / Phone', 'Medical'];
-const SAVABLE_ITEMS = ['Rates', 'House Insurance', 'Exterior Maintenance', 'Lawns / Gardens', 'Building Insurance', 'Water Rates', 'Security'];
+const COMMON_COST_OPTIONS = [
+    'Rates', 'House Insurance', 'Contents Insurance', 'Electricity / Gas',
+    'Internet / Phone', 'Food & Groceries', 'Transport & Petrol',
+    'Medical & Health', 'Lawn & Garden', 'Home Maintenance'
+];
 
 export function CostsStep({ onNext, onBack }: CostsStepProps) {
-    const { costs, setCosts, totalCurrentCostsYearly, totalVillageSavingsYearly } = useCalculator();
+    const {
+        costs,
+        setCosts,
+        totalCurrentCostsYearly,
+        totalVillageSavingsYearly
+    } = useCalculator();
+
+    // Derived state/setter
+    const currentCosts = costs.currentCosts || [];
+    const setCurrentCosts = (newCosts: CostItem[]) => {
+        setCosts({ ...costs, currentCosts: newCosts });
+    };
     const { showToast } = useToast();
-    const [activeTab, setActiveTab] = useState<TabType>('current');
 
-    // Modal State
-    const [modalVisible, setModalVisible] = useState(false);
+    // Inline Edit State
     const [editingItem, setEditingItem] = useState<{ name: string; isOther: boolean } | null>(null);
+    const [inputName, setInputName] = useState('');
     const [inputValue, setInputValue] = useState('');
-    const [inputName, setInputName] = useState(''); // Only for "Other"
-    const [inputFreq, setInputFreq] = useState<CostItem['frequency']>('weekly');
+    const [inputFreq, setInputFreq] = useState<CostItem['frequency']>('yearly');
 
-    const openAddModal = (name: string, isOther: boolean) => {
+    // Helper: Is this cost a village saving?
+    const isVillageSaving = (name: string) => {
+        const savingNames = [
+            'Rates', 'House Insurance', 'Lawn', 'Garden', 'Maintenance', 'Exterior'
+        ];
+        // Simple string match or check logic
+        return savingNames.some(s => name.toLowerCase().includes(s.toLowerCase()));
+    };
+
+    const startAdding = (name: string, isOther: boolean) => {
         setEditingItem({ name, isOther });
         setInputValue('');
         setInputName(isOther ? '' : name);
-        setInputFreq('weekly');
-        setModalVisible(true);
+        setInputFreq('yearly');
+    };
+
+    const handleCancel = () => {
+        setEditingItem(null);
     };
 
     const handleSave = () => {
@@ -50,22 +71,18 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
             id: Date.now().toString(),
             name: inputName,
             value: val,
-            frequency: inputFreq
+            frequency: inputFreq,
+            isVillageSaving: isVillageSaving(inputName)
         };
 
-        setCosts({ ...costs, currentCosts: [...costs.currentCosts, newItem] });
-        setModalVisible(false);
-        showToast('Item added', 'success');
+        setCurrentCosts([...currentCosts, newItem]);
+        setEditingItem(null); // Return to grid
+        showToast('Cost added', 'success');
     };
 
-    const removeItem = (id: string) => {
-        setCosts({ ...costs, currentCosts: costs.currentCosts.filter(c => c.id !== id) });
+    const removeCost = (id: string) => {
+        setCurrentCosts(currentCosts.filter(c => c.id !== id));
     };
-
-    // Derived Savings List
-    const savingsList = useMemo(() => {
-        return costs.currentCosts.filter(c => SAVABLE_ITEMS.includes(c.name));
-    }, [costs.currentCosts]);
 
     return (
         <View style={styles.container}>
@@ -75,191 +92,156 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                     <Ionicons name="arrow-back" size={24} color="#666" />
                 </TouchableOpacity>
                 <View>
-                    <Text style={styles.headerTitle}>Costs & Savings</Text>
+                    <Text style={styles.headerTitle}>Living Costs</Text>
                 </View>
                 <View style={{ width: 24 }} />
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabs}>
-                <TouchableOpacity style={[styles.tab, activeTab === 'current' && styles.activeTab]} onPress={() => setActiveTab('current')}>
-                    <Text style={[styles.tabText, activeTab === 'current' && styles.activeTabText]}>Current Costs</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.tab, activeTab === 'savings' && styles.activeTab]} onPress={() => setActiveTab('savings')}>
-                    <Text style={[styles.tabText, activeTab === 'savings' && styles.activeTabText]}>Village Savings</Text>
-                </TouchableOpacity>
-            </View>
-
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {activeTab === 'current' ? (
+
+                {/* 1. VIEW MODE */}
+                {!editingItem && (
                     <>
                         {/* Summary Card */}
                         <View style={styles.summaryCard}>
-                            <Text style={styles.summaryLabel}>Total Yearly Cost</Text>
+                            <Text style={styles.summaryLabel}>Total Annual Costs</Text>
                             <Text style={styles.summaryValue}>${totalCurrentCostsYearly.toLocaleString()}</Text>
                         </View>
 
-                        <View style={styles.helper}>
-                            <Text style={styles.helperText}>What do you spend now?</Text>
-                            <Tooltip content="Include all regular expenses to get an accurate comparison." />
-                        </View>
+                        {/* Village Savings Highlight */}
+                        {totalVillageSavingsYearly > 0 && (
+                            <View style={styles.savingsCard}>
+                                <View style={styles.savingsHeader}>
+                                    <Ionicons name="trending-up" size={24} color="#2e7d32" />
+                                    <View>
+                                        <Text style={styles.savingsTitle}>Projected Savings</Text>
+                                        <Text style={styles.savingsSub}>covered by village fee</Text>
+                                    </View>
+                                </View>
+                                <Text style={styles.savingsValue}>${totalVillageSavingsYearly.toLocaleString()} / yr</Text>
+                            </View>
+                        )}
 
                         {/* Grid */}
-                        <Text style={styles.sectionTitle}>Add Cost</Text>
                         <View style={styles.grid}>
-                            {TOP_7_CURRENT.map(name => (
-                                <TouchableOpacity key={name} style={styles.gridBtn} onPress={() => openAddModal(name, false)}>
+                            {COMMON_COST_OPTIONS.map(name => (
+                                <TouchableOpacity key={name} style={styles.gridBtn} onPress={() => startAdding(name, false)}>
                                     <Text style={styles.gridBtnText}>{name}</Text>
-                                    <Ionicons name="add-circle" size={20} color={'#0a7ea4'} />
+                                    <Ionicons name="add-circle" size={24} color="#0a7ea4" />
                                 </TouchableOpacity>
                             ))}
-                            <TouchableOpacity style={[styles.gridBtn, styles.otherBtn]} onPress={() => openAddModal('Other', true)}>
+                            {/* Other */}
+                            <TouchableOpacity style={[styles.gridBtn, styles.otherBtn]} onPress={() => startAdding('Other', true)}>
                                 <Text style={[styles.gridBtnText, { color: '#fff' }]}>Other</Text>
-                                <Ionicons name="add" size={20} color="#fff" />
+                                <Ionicons name="add" size={24} color="#fff" />
                             </TouchableOpacity>
                         </View>
 
-                        {/* List Items */}
-                        {costs.currentCosts.length > 0 && (
+                        {/* Lists */}
+                        {currentCosts.length > 0 && (
                             <View style={styles.listSection}>
-                                <Text style={styles.sectionTitle}>Your Costs</Text>
-                                {costs.currentCosts.map(item => (
+                                <Text style={styles.sectionTitle}>Your Items</Text>
+                                {currentCosts.map((item: CostItem) => (
                                     <View key={item.id} style={styles.itemCard}>
-                                        <View>
-                                            <Text style={styles.itemName}>{item.name}</Text>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={styles.itemRow}>
+                                                <Text style={styles.itemName}>{item.name}</Text>
+                                                {item.isVillageSaving && (
+                                                    <View style={styles.savingBadge}>
+                                                        <Text style={styles.savingBadgeText}>Village Saving</Text>
+                                                    </View>
+                                                )}
+                                            </View>
                                             <Text style={styles.itemSub}>
                                                 ${item.value.toLocaleString()} / {item.frequency}
                                             </Text>
                                         </View>
-                                        <TouchableOpacity onPress={() => removeItem(item.id)}>
+                                        <TouchableOpacity onPress={() => removeCost(item.id)}>
                                             <Ionicons name="trash-outline" size={20} color="#ff4444" />
                                         </TouchableOpacity>
                                     </View>
                                 ))}
                             </View>
                         )}
-                    </>
-                ) : (
-                    <>
-                        {/* Savings View */}
-                        <View style={[styles.summaryCard, styles.summaryCardGreen]}>
-                            <Text style={styles.summaryLabel}>Potential Savings</Text>
-                            <Text style={styles.summaryValue}>${totalVillageSavingsYearly.toLocaleString()}</Text>
-                        </View>
 
-                        <View style={styles.reasoningBox}>
-                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                                <Ionicons name="information-circle" size={20} color="#2e7d32" />
-                                <Text style={styles.reasoningTitle}>Why these savings?</Text>
-                            </View>
-                            <Text style={styles.reasoningText}>
-                                When you move into a Retirement Village, many of your current property-related costs are covered by the village's weekly fee.
-                            </Text>
-                            <Text style={[styles.reasoningText, { marginTop: 8 }]}>
-                                We've identified the costs below from your list that you likely won't have to pay anymore.
-                            </Text>
-                        </View>
-
-                        {savingsList.length > 0 ? (
-                            <View style={styles.listSection}>
-                                <Text style={styles.sectionTitle}>Costs You Save</Text>
-                                {savingsList.map(item => (
-                                    <View key={item.id} style={styles.itemCard}>
-                                        <View>
-                                            <Text style={styles.itemName}>{item.name}</Text>
-                                            <Text style={styles.itemSub}>
-                                                ${item.value.toLocaleString()} / {item.frequency}
-                                            </Text>
-                                        </View>
-                                        <Ionicons name="checkmark-circle" size={24} color="#2e7d32" />
-                                    </View>
-                                ))}
-                            </View>
-                        ) : (
-                            <View style={styles.emptyState}>
-                                <Ionicons name="wallet-outline" size={48} color="#ccc" />
-                                <Text style={styles.emptyStateText}>
-                                    No savable costs found yet. Try adding things like "Rates", "Insurance", or "Maintenance" in the Current Costs tab.
-                                </Text>
-                            </View>
-                        )}
+                        <View style={{ height: 100 }} />
                     </>
                 )}
 
-                <View style={{ height: 100 }} />
-            </ScrollView>
+                {/* 2. EDIT MODE: Inline Form */}
+                {editingItem && (
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                        <View style={styles.inlineFormCard}>
+                            <View style={styles.cardHeader}>
+                                <Text style={styles.cardTitle}>
+                                    {editingItem.isOther ? 'Add Cost' : `Add ${editingItem.name}`}
+                                </Text>
+                            </View>
 
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.nextButton} onPress={onNext}>
-                    <Text style={styles.nextButtonText}>Next Step</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </TouchableOpacity>
-            </View>
+                            {editingItem.isOther && (
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Name</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="E.g. Netflix"
+                                        value={inputName}
+                                        onChangeText={setInputName}
+                                        autoFocus
+                                    />
+                                </View>
+                            )}
 
-            {/* Modal */}
-            <Modal visible={modalVisible} transparent animationType="fade">
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>
-                                {editingItem?.isOther ? 'Add Other Item' : `Add ${editingItem?.name}`}
-                            </Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Ionicons name="close" size={24} color="#666" />
-                            </TouchableOpacity>
-                        </View>
-
-                        {editingItem?.isOther && (
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Name</Text>
+                                <Text style={styles.label}>Cost ($)</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="E.g. Gym Membership"
-                                    value={inputName}
-                                    onChangeText={setInputName}
-                                    autoFocus
+                                    placeholder="0.00"
+                                    keyboardType="numeric"
+                                    value={inputValue}
+                                    onChangeText={setInputValue}
+                                    autoFocus={!editingItem.isOther}
                                 />
                             </View>
-                        )}
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Cost ($)</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="0.00"
-                                keyboardType="numeric"
-                                value={inputValue}
-                                onChangeText={setInputValue}
-                                autoFocus={!editingItem?.isOther}
-                            />
-                        </View>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Frequency</Text>
+                                <View style={styles.freqRow}>
+                                    {(['weekly', 'fortnightly', 'monthly', 'yearly'] as const).map(f => (
+                                        <TouchableOpacity
+                                            key={f}
+                                            style={[styles.freqChip, inputFreq === f && styles.freqChipActive]}
+                                            onPress={() => setInputFreq(f)}
+                                        >
+                                            <Text style={[styles.freqText, inputFreq === f && styles.freqTextActive]}>
+                                                {f.charAt(0).toUpperCase() + f.slice(1)}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Frequency</Text>
-                            <View style={styles.freqRow}>
-                                {(['weekly', 'monthly', 'yearly'] as const).map(f => (
-                                    <TouchableOpacity
-                                        key={f}
-                                        style={[styles.freqChip, inputFreq === f && styles.freqChipActive]}
-                                        onPress={() => setInputFreq(f)}
-                                    >
-                                        <Text style={[styles.freqText, inputFreq === f && styles.freqTextActive]}>
-                                            {f.charAt(0).toUpperCase() + f.slice(1)}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
+                            <View style={styles.formActions}>
+                                <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
+                                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+                                    <Text style={styles.saveBtnText}>Add Cost</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
+                    </KeyboardAvoidingView>
+                )}
 
-                        <TouchableOpacity
-                            style={styles.saveBtn}
-                            onPress={handleSave}
-                        >
-                            <Text style={styles.saveBtnText}>Add Item</Text>
-                        </TouchableOpacity>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
+            </ScrollView>
+
+            {!editingItem && (
+                <View style={styles.footer}>
+                    <TouchableOpacity style={styles.nextButton} onPress={onNext}>
+                        <Text style={styles.nextButtonText}>Next Step</Text>
+                        <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+            )}
         </View>
     );
 }
@@ -271,9 +253,9 @@ const styles = StyleSheet.create({
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
         justifyContent: 'space-between',
         marginBottom: 16,
+        paddingHorizontal: 20,
     },
     backBtn: {
         padding: 8,
@@ -284,84 +266,40 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333',
     },
-    tabs: {
-        flexDirection: 'row',
-        paddingHorizontal: 20,
-        marginBottom: 20,
-        gap: 12,
-    },
-    tab: {
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 20,
-        backgroundColor: '#f0f0f0',
-        alignItems: 'center',
-    },
-    activeTab: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#eee',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-    },
-    tabText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#666',
-    },
-    activeTabText: {
-        color: '#333',
-        fontWeight: 'bold',
-    },
     content: {
         flex: 1,
         paddingHorizontal: 20,
     },
     summaryCard: {
-        backgroundColor: '#ff6b6b', // Red-ish for costs
+        backgroundColor: '#fff',
         borderRadius: 16,
-        padding: 20,
-        marginBottom: 16,
-        alignItems: 'center',
-        shadowColor: "#ff6b6b",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-    },
-    summaryCardGreen: {
-        backgroundColor: '#2e7d32', // Green for savings
-        shadowColor: "#2e7d32",
-    },
-    summaryLabel: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 4,
-        textTransform: 'uppercase',
-    },
-    summaryValue: {
-        color: '#fff',
-        fontSize: 32,
-        fontWeight: 'bold',
-    },
-    helper: {
-        flexDirection: 'row',
-        justifyContent: 'center',
+        padding: 24,
         alignItems: 'center',
         marginBottom: 24,
-        gap: 8,
+        borderWidth: 1,
+        borderColor: '#eee',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
     },
-    helperText: {
+    summaryLabel: {
         color: '#666',
         fontSize: 14,
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    summaryValue: {
+        color: '#333',
+        fontSize: 36,
+        fontWeight: 'bold',
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#333',
+        fontSize: 18,
+        fontWeight: '600',
         marginBottom: 16,
+        color: '#333',
     },
     grid: {
         flexDirection: 'row',
@@ -372,42 +310,43 @@ const styles = StyleSheet.create({
         width: '48%',
         backgroundColor: '#fff',
         padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#eee',
+        borderRadius: 12,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 0,
+        borderWidth: 1,
+        borderColor: '#eee',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
     },
     otherBtn: {
-        backgroundColor: '#333',
-        borderColor: '#333',
+        backgroundColor: '#666',
+        borderColor: '#666',
     },
     gridBtnText: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '500',
         color: '#333',
-        flex: 1,
-        marginRight: 8,
     },
     listSection: {
         marginTop: 32,
     },
     itemCard: {
+        backgroundColor: '#fff',
+        padding: 16,
+        borderRadius: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#fff',
-        borderRadius: 12,
         marginBottom: 12,
         borderWidth: 1,
         borderColor: '#eee',
     },
     itemName: {
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '500',
         color: '#333',
     },
     itemSub: {
@@ -415,34 +354,54 @@ const styles = StyleSheet.create({
         color: '#666',
         marginTop: 2,
     },
-    reasoningBox: {
+    itemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    savingBadge: {
         backgroundColor: '#e8f5e9',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 24,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: '#c8e6c9',
     },
-    reasoningTitle: {
+    savingBadgeText: {
+        fontSize: 10,
+        color: '#2e7d32',
+        fontWeight: '600',
+    },
+    savingsCard: {
+        marginTop: -10,
+        marginBottom: 24,
+        backgroundColor: '#e8f5e9',
+        padding: 20,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#c8e6c9',
+        alignItems: 'center',
+    },
+    savingsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 8,
+    },
+    savingsTitle: {
         fontSize: 16,
         fontWeight: 'bold',
         color: '#2e7d32',
     },
-    reasoningText: {
-        fontSize: 14,
+    savingsSub: {
+        fontSize: 12,
+        color: '#4caf50',
+    },
+    savingsValue: {
+        fontSize: 24,
+        fontWeight: 'bold',
         color: '#1b5e20',
-        lineHeight: 20,
-    },
-    emptyState: {
-        alignItems: 'center',
-        padding: 32,
-        gap: 16,
-    },
-    emptyStateText: {
-        textAlign: 'center',
-        color: '#999',
-        fontSize: 14,
-        lineHeight: 20,
+        marginLeft: 36,
     },
     footer: {
         padding: 20,
@@ -458,47 +417,45 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 30,
         gap: 8,
-        shadowColor: "#0a7ea4",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
     },
     nextButtonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
     },
-    // Modal
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        padding: 20,
-    },
-    modalContent: {
+
+    // Inline Form Styles (Shared with AssetsStep)
+    inlineFormCard: {
         backgroundColor: '#fff',
-        borderRadius: 24,
-        padding: 24,
+        borderRadius: 16,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        marginTop: 8,
     },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
+    cardHeader: {
+        marginBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        paddingBottom: 16,
     },
-    modalTitle: {
-        fontSize: 20,
+    cardTitle: {
+        fontSize: 18,
         fontWeight: 'bold',
         color: '#333',
     },
     inputGroup: {
         marginBottom: 20,
-        gap: 8,
     },
     label: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '500',
         color: '#666',
+        marginBottom: 8,
     },
     input: {
         backgroundColor: '#f9f9f9',
@@ -506,7 +463,7 @@ const styles = StyleSheet.create({
         borderColor: '#eee',
         borderRadius: 12,
         padding: 16,
-        fontSize: 18,
+        fontSize: 16,
     },
     freqRow: {
         flexDirection: 'row',
@@ -519,26 +476,43 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         backgroundColor: '#f0f0f0',
         borderWidth: 1,
-        borderColor: 'transparent',
+        borderColor: '#eee',
     },
     freqChipActive: {
-        backgroundColor: '#ffebeb', // light red
-        borderColor: '#ff6b6b',
+        backgroundColor: '#e1f5fe',
+        borderColor: '#0a7ea4',
     },
     freqText: {
         fontSize: 14,
         color: '#666',
     },
     freqTextActive: {
-        color: '#ff6b6b',
+        color: '#0a7ea4',
+        fontWeight: '600',
+    },
+    formActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 8,
+    },
+    cancelBtn: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: '#f5f5f5',
+        alignItems: 'center',
+    },
+    cancelBtnText: {
+        color: '#666',
+        fontSize: 16,
         fontWeight: '600',
     },
     saveBtn: {
-        backgroundColor: '#ff6b6b',
+        flex: 1,
         padding: 16,
-        borderRadius: 16,
+        borderRadius: 12,
+        backgroundColor: '#0a7ea4',
         alignItems: 'center',
-        marginTop: 8,
     },
     saveBtnText: {
         color: '#fff',

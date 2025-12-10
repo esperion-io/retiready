@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Peep, { Accessories, Body, Face, FacialHair, Hair } from 'react-native-peeps';
 import { AssetsStep } from '../../components/calculator/steps/AssetsStep';
 import { CostsStep } from '../../components/calculator/steps/CostsStep';
+import { NextStepsStep } from '../../components/calculator/steps/NextStepsStep';
 import { PackagesStep } from '../../components/calculator/steps/PackagesStep';
 import { ResultsStep } from '../../components/calculator/steps/ResultsStep';
 import { UserInfoStep } from '../../components/calculator/steps/UserInfoStep';
@@ -15,7 +16,8 @@ const STEPS = [
     AssetsStep,
     CostsStep,
     PackagesStep,
-    ResultsStep
+    ResultsStep,
+    NextStepsStep
 ];
 
 const BACKGROUNDS = [

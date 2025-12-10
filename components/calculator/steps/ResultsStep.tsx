@@ -7,9 +7,10 @@ import { AssetItem, useCalculator } from '../../../context/CalculatorContext';
 interface ResultsStepProps {
     onRestart: () => void;
     onBack: () => void;
+    onNext: () => void; // Added onNext
 }
 
-export function ResultsStep({ onRestart, onBack }: ResultsStepProps) {
+export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
     const {
         userInfo,
         assets,
@@ -59,6 +60,7 @@ export function ResultsStep({ onRestart, onBack }: ResultsStepProps) {
 
     // Loop through each year to calculate Net Flow
     let lifetimeNetFlow = 0;
+    let lifetimeGrossIncome = 0;
 
     for (let i = 1; i <= yearsLeft; i++) {
         // Calculate Income for Year i
@@ -68,34 +70,43 @@ export function ResultsStep({ onRestart, onBack }: ResultsStepProps) {
             .filter(a => a.duration === undefined || a.duration >= i)
             .reduce((sum, item) => sum + getAnnualValue(item), 0);
 
+        lifetimeGrossIncome += yearIncome;
         const yearNet = yearIncome - totalAnnualCosts;
         lifetimeNetFlow += yearNet;
     }
 
-    // Fixed Refund (Typical ORA)
-    const fixedRefund = packageCost * 0.70;
+    // Total Liquid Pot (Cash + Income - Costs)
+    const liquidPot = freedEquity + lifetimeNetFlow;
 
-    // Total Pot = Equity + Lifetime Net Flow + Capital Refund
-    const totalPot = freedEquity + lifetimeNetFlow + fixedRefund;
+    // Fixed Refund (Typical ORA - 70% of entry)
+    const fixedRefund = packageCost * 0.70;
 
     // Constraints
     const MIN_MONTHLY_SPEND = 2000;
     const minTotalSpend = MIN_MONTHLY_SPEND * 12 * yearsLeft;
-    const maxTotalSpend = totalPot;
 
-    // Only allow slider if max > min (otherwise capital warning)
-    const isCapitalSufficient = totalPot >= minTotalSpend;
+    // Max Spend is capped at Liquid Pot (cannot spend the ORA refund while living there)
+    const maxTotalSpend = Math.max(liquidPot, minTotalSpend);
+
+    // Only allow slider if we have enough liquid cash to meet min spend
+    const isCapitalSufficient = liquidPot >= minTotalSpend;
 
     const spendRange = Math.max(maxTotalSpend - minTotalSpend, 0);
     const currentTotalSpend = minTotalSpend + (spendRange * spendRatio);
 
     const monthlySpend = Math.max(currentTotalSpend / yearsLeft / 12, 0);
-    const legacy = Math.max(totalPot - currentTotalSpend, 0);
 
-    const progress = Math.min((totalAssets / (packageCost || 1)) * 100, 100);
+    // Legacy = The unspent liquid cash + The fixed refund
+    const remainingLiquid = Math.max(liquidPot - currentTotalSpend, 0);
+    const legacy = remainingLiquid + fixedRefund;
+
+    // Wealth = Assets + Lifetime Income
+    const totalWealth = totalAssets + lifetimeGrossIncome;
+    const progress = Math.min((totalWealth / (packageCost || 1)) * 100, 100);
 
     // Dynamic warning text for capital check
-    const maxPossibleMonthly = Math.max((totalPot / yearsLeft / 12), 0);
+    // Max possible per month using only liquid funds
+    const maxPossibleMonthly = Math.max((liquidPot / yearsLeft / 12), 0);
 
     // Config based on Verdict
     const verdictConfig = isReady ? {
@@ -140,16 +151,16 @@ export function ResultsStep({ onRestart, onBack }: ResultsStepProps) {
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <Ionicons name="cash" size={24} color="#0a7ea4" />
-                        <Text style={styles.cardTitle}>Capital Snapshot</Text>
+                        <Text style={styles.cardTitle}>Wealth Snapshot</Text>
                     </View>
 
-                    <Text style={styles.label}>Assets vs. Entry Cost</Text>
+                    <Text style={styles.label}>Wealth vs. Entry Cost</Text>
                     <View style={styles.barContainer}>
                         <View style={[styles.barFill, { width: `${progress}%`, backgroundColor: isReady ? '#2e7d32' : '#ff8f00' }]} />
                         <View style={styles.markerLine} />
                     </View>
                     <View style={styles.barLabels}>
-                        <Text style={styles.barLabel}>Have: ${totalAssets.toLocaleString()}</Text>
+                        <Text style={styles.barLabel}>Have: ${totalWealth.toLocaleString()}</Text>
                         <Text style={styles.barLabel}>Need: ${packageCost.toLocaleString()}</Text>
                     </View>
 
@@ -240,7 +251,7 @@ export function ResultsStep({ onRestart, onBack }: ResultsStepProps) {
                         </View>
 
                         <Text style={styles.note}>
-                            *Inheritance calculated as remaining capital after {yearsLeft} years of drawing monthly funds. "Spend It" fully drains the capital refund.
+                            *Inheritance = 70% Unit Refund + Any unspent liquid capital. "Spend It" drains your liquid capital but leaves the refund intact.
                         </Text>
                     </View>
                 )}
@@ -277,9 +288,9 @@ export function ResultsStep({ onRestart, onBack }: ResultsStepProps) {
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.restartBtn} onPress={onRestart}>
-                    <Ionicons name="refresh" size={20} color="#0a7ea4" />
-                    <Text style={styles.restartText}>Start New Journey</Text>
+                <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+                    <Text style={styles.primaryBtnText}>View Next Steps</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#fff" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -289,6 +300,25 @@ export function ResultsStep({ onRestart, onBack }: ResultsStepProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    // ... existing styles ...
+    primaryBtn: {
+        backgroundColor: '#0a7ea4',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        borderRadius: 30,
+        gap: 8,
+        shadowColor: "#0a7ea4",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    primaryBtnText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
     },
     headerRow: {
         flexDirection: 'row',

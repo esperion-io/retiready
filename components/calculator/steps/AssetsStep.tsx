@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { AssetItem, useCalculator } from '../../../context/CalculatorContext';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { AssetItem, TabType, useCalculator } from '../../../context/CalculatorContext';
 import { useToast } from '../../../context/ToastContext';
 
 interface AssetsStepProps {
@@ -9,22 +9,31 @@ interface AssetsStepProps {
     onBack: () => void;
 }
 
-type TabType = 'income' | 'savings' | 'assets';
+const TOP_7_INCOME = [
+    'Salary/Wages', 'NZ Super', 'Overseas Pension', 'Investment Income',
+    'Rental Income', 'Dividends', 'Term Deposit Interest'
+];
 
-const TOP_7_INCOME = ['Salary', 'Wages', 'Superannuation', 'Dividends', 'Interest', 'Rental Income', 'Business Profit'];
-const TOP_7_SAVINGS = ['KiwiSaver / Super', 'Bank Savings', 'Term Deposit', 'Shares', 'Managed Funds', 'Bonds', 'Crypto'];
-const TOP_7_ASSETS = ['Family Home', 'Investment Property', 'Holiday Home', 'Vehicle', 'Boat', 'Caravan', 'Collections'];
+const TOP_7_SAVINGS = [
+    'Bank Accounts', 'Term Deposits', 'KiwiSaver', 'Managed Funds',
+    'Shares/Bonds', 'Cash', 'Inheritance'
+];
+
+const TOP_7_ASSETS = [
+    'Family Home', 'Holiday Home', 'Rental Property', 'Vehicle',
+    'Boat/Caravan', 'Jewelry/Art', 'Collectibles'
+];
 
 export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
-    const { assets, setAssets, totalAssets, totalAnnualIncome } = useCalculator();
+    const { assets, setAssets, totalAnnualIncome } = useCalculator();
     const { showToast } = useToast();
+
     const [activeTab, setActiveTab] = useState<TabType>('income');
 
-    // Modal State
-    const [modalVisible, setModalVisible] = useState(false);
+    // Inline Edit State
     const [editingItem, setEditingItem] = useState<{ name: string; isOther: boolean } | null>(null);
-    const [inputValue, setInputValue] = useState('');
     const [inputName, setInputName] = useState(''); // Only for "Other"
+    const [inputValue, setInputValue] = useState('');
     const [inputFreq, setInputFreq] = useState<AssetItem['frequency']>('yearly');
     const [inputDuration, setInputDuration] = useState(''); // Years remaining
 
@@ -33,16 +42,20 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
             case 'income': return TOP_7_INCOME;
             case 'savings': return TOP_7_SAVINGS;
             case 'assets': return TOP_7_ASSETS;
+            default: return [];
         }
     }, [activeTab]);
 
-    const openAddModal = (name: string, isOther: boolean) => {
+    const startAdding = (name: string, isOther: boolean) => {
         setEditingItem({ name, isOther });
         setInputValue('');
         setInputName(isOther ? '' : name);
         setInputFreq('yearly');
-        setInputDuration(''); // Default empty (implies lifetime/indefinite if left blank? or force strict?)
-        setModalVisible(true);
+        setInputDuration('');
+    };
+
+    const handleCancel = () => {
+        setEditingItem(null);
     };
 
     const handleSave = () => {
@@ -80,7 +93,7 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
         };
 
         setAssets([...assets, newItem]);
-        setModalVisible(false);
+        setEditingItem(null);
         showToast('Item added', 'success');
     };
 
@@ -95,7 +108,6 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
         return a.type === 'asset';
     });
 
-    // ... existing tabTotal and displayTotal logic ...
     const displayTotal = activeTab === 'income' ? totalAnnualIncome :
         tabItems.reduce((sum, i) => sum + i.value, 0);
 
@@ -107,157 +119,169 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                     <Ionicons name="arrow-back" size={24} color="#666" />
                 </TouchableOpacity>
                 <View>
-                    <Text style={styles.headerTitle}>Assets & Income</Text>
+                    <Text style={styles.headerTitle}>Income, Savings & Assets</Text>
                 </View>
                 <View style={{ width: 24 }} />
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabs}>
-                {(['income', 'savings', 'assets'] as TabType[]).map(t => (
-                    <TouchableOpacity
-                        key={t}
-                        style={[styles.tab, activeTab === t && styles.activeTab]}
-                        onPress={() => setActiveTab(t)}
-                    >
-                        <Text style={[styles.tabText, activeTab === t && styles.activeTabText]}>
-                            {t.charAt(0).toUpperCase() + t.slice(1)}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Summary Card */}
+            <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>Total {activeTab === 'income' ? 'Annual Income' : activeTab === 'savings' ? 'Savings' : 'Assets'}</Text>
+                <Text style={styles.summaryValue}>${displayTotal.toLocaleString()}</Text>
             </View>
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Summary Card */}
-                <View style={styles.summaryCard}>
-                    <Text style={styles.summaryLabel}>Total {activeTab === 'income' ? 'Annual Income' : activeTab === 'savings' ? 'Savings' : 'Assets'}</Text>
-                    <Text style={styles.summaryValue}>${displayTotal.toLocaleString()}</Text>
-                </View>
-
-                {/* Top 7 Grid */}
-                <Text style={styles.sectionTitle}>Add {activeTab}</Text>
-                <View style={styles.grid}>
-                    {currentList.map(name => (
-                        <TouchableOpacity key={name} style={styles.gridBtn} onPress={() => openAddModal(name, false)}>
-                            <Text style={styles.gridBtnText}>{name}</Text>
-                            <Ionicons name="add-circle" size={20} color="#0a7ea4" />
+            {/* Tabs */}
+            {!editingItem && (
+                <View style={styles.tabs}>
+                    {(['income', 'savings', 'assets'] as TabType[]).map(t => (
+                        <TouchableOpacity
+                            key={t}
+                            style={[styles.tab, activeTab === t && styles.activeTab]}
+                            onPress={() => setActiveTab(t)}
+                        >
+                            <Text style={[styles.tabText, activeTab === t && styles.activeTabText]}>
+                                {t.charAt(0).toUpperCase() + t.slice(1)}
+                            </Text>
                         </TouchableOpacity>
                     ))}
-                    {/* 8th Option: Other */}
-                    <TouchableOpacity style={[styles.gridBtn, styles.otherBtn]} onPress={() => openAddModal('Other', true)}>
-                        <Text style={[styles.gridBtnText, { color: '#fff' }]}>Other</Text>
-                        <Ionicons name="add" size={20} color="#fff" />
-                    </TouchableOpacity>
                 </View>
+            )}
 
-                {/* List of Added Items */}
-                {tabItems.length > 0 && (
-                    <View style={styles.listSection}>
-                        <Text style={styles.sectionTitle}>Your Items</Text>
-                        {tabItems.map(item => (
-                            <View key={item.id} style={styles.itemCard}>
-                                <View>
-                                    <Text style={styles.itemName}>{item.name}</Text>
-                                    <Text style={styles.itemSub}>
-                                        ${item.value.toLocaleString()}
-                                        {item.type === 'income' && item.frequency !== 'lump_sum' ? `/${item.frequency}` : ''}
-                                        {item.duration ? ` for ${item.duration} yr${item.duration > 1 ? 's' : ''}` : ''}
-                                    </Text>
-                                </View>
-                                <TouchableOpacity onPress={() => removeAsset(item.id)}>
-                                    <Ionicons name="trash-outline" size={20} color="#ff4444" />
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+
+                {/* 1. VIEW MODE: Summary + Grid + List */}
+                {!editingItem && (
+                    <>
+                        {/* Top 7 Grid */}
+                        <View style={styles.grid}>
+                            {currentList.map(name => (
+                                <TouchableOpacity key={name} style={styles.gridBtn} onPress={() => startAdding(name, false)}>
+                                    <Text style={styles.gridBtnText}>{name}</Text>
+                                    <Ionicons name="add-circle" size={20} color="#0a7ea4" />
                                 </TouchableOpacity>
-                            </View>
-                        ))}
-                    </View>
-                )}
-
-                <View style={{ height: 100 }} />
-            </ScrollView>
-
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.nextButton} onPress={onNext}>
-                    <Text style={styles.nextButtonText}>Next Step</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </TouchableOpacity>
-            </View>
-
-            {/* Add Item Modal */}
-            <Modal visible={modalVisible} transparent animationType="fade">
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>
-                                {editingItem?.isOther ? 'Add Other Item' : `Add ${editingItem?.name}`}
-                            </Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Ionicons name="close" size={24} color="#666" />
+                            ))}
+                            {/* 8th Option: Other */}
+                            <TouchableOpacity style={[styles.gridBtn, styles.otherBtn]} onPress={() => startAdding('Other', true)}>
+                                <Text style={[styles.gridBtnText, { color: '#fff' }]}>Other</Text>
+                                <Ionicons name="add" size={20} color="#fff" />
                             </TouchableOpacity>
                         </View>
 
-                        {editingItem?.isOther && (
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Name</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="E.g. BitCoin"
-                                    value={inputName}
-                                    onChangeText={setInputName}
-                                    autoFocus
-                                />
+                        {/* List of Added Items */}
+                        {tabItems.length > 0 && (
+                            <View style={styles.listSection}>
+                                <Text style={styles.sectionTitle}>Your Items</Text>
+                                {tabItems.map(item => (
+                                    <View key={item.id} style={styles.itemCard}>
+                                        <View>
+                                            <Text style={styles.itemName}>{item.name}</Text>
+                                            <Text style={styles.itemSub}>
+                                                ${item.value.toLocaleString()}
+                                                {item.type === 'income' && item.frequency !== 'lump_sum' ? `/${item.frequency}` : ''}
+                                                {item.duration ? ` for ${item.duration} yr${item.duration > 1 ? 's' : ''}` : ''}
+                                            </Text>
+                                        </View>
+                                        <TouchableOpacity onPress={() => removeAsset(item.id)}>
+                                            <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
                             </View>
                         )}
+                        <View style={{ height: 100 }} />
+                    </>
+                )}
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Value ($)</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="0.00"
-                                keyboardType="numeric"
-                                value={inputValue}
-                                onChangeText={setInputValue}
-                                autoFocus={!editingItem?.isOther} // Focus value if name is preset
-                            />
-                        </View>
+                {/* 2. EDIT MODE: Inline Form */}
+                {editingItem && (
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                        <View style={styles.inlineFormCard}>
+                            <View style={styles.cardHeader}>
+                                <Text style={styles.cardTitle}>
+                                    {editingItem.isOther ? 'Add Item' : `Add ${editingItem.name}`}
+                                </Text>
+                            </View>
 
-                        {activeTab === 'income' && (
-                            <>
+                            {editingItem.isOther && (
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.label}>Frequency</Text>
-                                    <View style={styles.freqRow}>
-                                        {(['weekly', 'fortnightly', 'monthly', 'yearly'] as const).map(f => (
-                                            <TouchableOpacity
-                                                key={f}
-                                                style={[styles.freqChip, inputFreq === f && styles.freqChipActive]}
-                                                onPress={() => setInputFreq(f)}
-                                            >
-                                                <Text style={[styles.freqText, inputFreq === f && styles.freqTextActive]}>
-                                                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                </View>
-
-                                <View style={styles.inputGroup}>
-                                    <Text style={styles.label}>Years Remaining (Optional)</Text>
+                                    <Text style={styles.label}>Name</Text>
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="E.g. 5 (Leave blank for lifetime)"
-                                        keyboardType="numeric"
-                                        value={inputDuration}
-                                        onChangeText={setInputDuration}
+                                        placeholder="E.g. BitCoin"
+                                        value={inputName}
+                                        onChangeText={setInputName}
+                                        autoFocus
                                     />
                                 </View>
-                            </>
-                        )}
+                            )}
 
-                        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                            <Text style={styles.saveBtnText}>Add Item</Text>
-                        </TouchableOpacity>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Value ($)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="0.00"
+                                    keyboardType="numeric"
+                                    value={inputValue}
+                                    onChangeText={setInputValue}
+                                    autoFocus={!editingItem.isOther}
+                                />
+                            </View>
+
+                            {activeTab === 'income' && (
+                                <>
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>Frequency</Text>
+                                        <View style={styles.freqRow}>
+                                            {(['weekly', 'fortnightly', 'monthly', 'yearly'] as const).map(f => (
+                                                <TouchableOpacity
+                                                    key={f}
+                                                    style={[styles.freqChip, inputFreq === f && styles.freqChipActive]}
+                                                    onPress={() => setInputFreq(f)}
+                                                >
+                                                    <Text style={[styles.freqText, inputFreq === f && styles.freqTextActive]}>
+                                                        {f.charAt(0).toUpperCase() + f.slice(1)}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>Years Remaining (Optional)</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="E.g. 5 (Leave blank for lifetime)"
+                                            keyboardType="numeric"
+                                            value={inputDuration}
+                                            onChangeText={setInputDuration}
+                                        />
+                                    </View>
+                                </>
+                            )}
+
+                            <View style={styles.formActions}>
+                                <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
+                                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+                                    <Text style={styles.saveBtnText}>Add Item</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </KeyboardAvoidingView>
+                )}
+
+            </ScrollView>
+
+            {/* Footer only visible if not editing (or we can keep it, but it might distract) */}
+            {!editingItem && (
+                <View style={styles.footer}>
+                    <TouchableOpacity style={styles.nextButton} onPress={onNext}>
+                        <Text style={styles.nextButtonText}>Next Step</Text>
+                        <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+            )}
         </View>
     );
 }
@@ -269,9 +293,9 @@ const styles = StyleSheet.create({
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20, // Add padding back
         justifyContent: 'space-between',
         marginBottom: 16,
+        paddingHorizontal: 20,
     },
     backBtn: {
         padding: 8,
@@ -285,22 +309,21 @@ const styles = StyleSheet.create({
     tabs: {
         flexDirection: 'row',
         paddingHorizontal: 20,
-        marginBottom: 20,
+        marginBottom: 16,
         gap: 12,
     },
     tab: {
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 20,
-        backgroundColor: '#f0f0f0',
+        backgroundColor: '#f5f5f5',
     },
     activeTab: {
         backgroundColor: '#0a7ea4',
     },
     tabText: {
-        fontSize: 14,
-        fontWeight: '600',
         color: '#666',
+        fontWeight: '600',
     },
     activeTabText: {
         color: '#fff',
@@ -312,31 +335,31 @@ const styles = StyleSheet.create({
     summaryCard: {
         backgroundColor: '#0a7ea4',
         borderRadius: 16,
-        padding: 20,
-        marginBottom: 24,
+        padding: 24,
         alignItems: 'center',
+        marginBottom: 24,
         shadowColor: "#0a7ea4",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
     },
     summaryLabel: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 4,
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: 14,
+        marginBottom: 8,
         textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     summaryValue: {
         color: '#fff',
-        fontSize: 32,
+        fontSize: 36,
         fontWeight: 'bold',
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#333',
+        fontSize: 18,
+        fontWeight: '600',
         marginBottom: 16,
+        color: '#333',
     },
     grid: {
         flexDirection: 'row',
@@ -344,45 +367,46 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     gridBtn: {
-        width: '48%', // roughly 2 cols
+        width: '48%',
         backgroundColor: '#fff',
         padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#eee',
+        borderRadius: 12,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 0,
+        borderWidth: 1,
+        borderColor: '#eee',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
     },
     otherBtn: {
-        backgroundColor: '#333',
-        borderColor: '#333',
+        backgroundColor: '#666',
+        borderColor: '#666',
     },
     gridBtnText: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '500',
         color: '#333',
-        flex: 1,
-        marginRight: 8,
     },
     listSection: {
         marginTop: 32,
     },
     itemCard: {
+        backgroundColor: '#fff',
+        padding: 16,
+        borderRadius: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#fff',
-        borderRadius: 12,
         marginBottom: 12,
         borderWidth: 1,
         borderColor: '#eee',
     },
     itemName: {
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '500',
         color: '#333',
     },
     itemSub: {
@@ -404,47 +428,45 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 30,
         gap: 8,
-        shadowColor: "#0a7ea4",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
     },
     nextButtonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
     },
-    // Modal Styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        padding: 20,
-    },
-    modalContent: {
+
+    // Inline Form Styles
+    inlineFormCard: {
         backgroundColor: '#fff',
-        borderRadius: 24,
-        padding: 24,
+        borderRadius: 16,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        marginTop: 8,
     },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
+    cardHeader: {
+        marginBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        paddingBottom: 16,
     },
-    modalTitle: {
-        fontSize: 20,
+    cardTitle: {
+        fontSize: 18,
         fontWeight: 'bold',
         color: '#333',
     },
     inputGroup: {
         marginBottom: 20,
-        gap: 8,
     },
     label: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '500',
         color: '#666',
+        marginBottom: 8,
     },
     input: {
         backgroundColor: '#f9f9f9',
@@ -452,7 +474,7 @@ const styles = StyleSheet.create({
         borderColor: '#eee',
         borderRadius: 12,
         padding: 16,
-        fontSize: 18,
+        fontSize: 16,
     },
     freqRow: {
         flexDirection: 'row',
@@ -465,10 +487,10 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         backgroundColor: '#f0f0f0',
         borderWidth: 1,
-        borderColor: 'transparent',
+        borderColor: '#eee',
     },
     freqChipActive: {
-        backgroundColor: '#e6f4f9',
+        backgroundColor: '#e1f5fe',
         borderColor: '#0a7ea4',
     },
     freqText: {
@@ -479,12 +501,29 @@ const styles = StyleSheet.create({
         color: '#0a7ea4',
         fontWeight: '600',
     },
-    saveBtn: {
-        backgroundColor: '#0a7ea4',
-        padding: 16,
-        borderRadius: 16,
-        alignItems: 'center',
+    formActions: {
+        flexDirection: 'row',
+        gap: 12,
         marginTop: 8,
+    },
+    cancelBtn: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: '#f5f5f5',
+        alignItems: 'center',
+    },
+    cancelBtnText: {
+        color: '#666',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    saveBtn: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: '#0a7ea4',
+        alignItems: 'center',
     },
     saveBtnText: {
         color: '#fff',

@@ -22,6 +22,8 @@ export type UserInfo = {
     avatar?: string; // Keep for fallback or overall theme if needed, but likely derived from Person 1 now
 };
 
+export type TabType = 'income' | 'savings' | 'assets';
+
 export type AssetItem = {
     id: string;
     name: string;
@@ -36,7 +38,8 @@ export type CostItem = {
     id: string;
     name: string;
     value: number;
-    frequency: 'weekly' | 'monthly' | 'yearly';
+    frequency: 'weekly' | 'fortnightly' | 'monthly' | 'yearly';
+    isVillageSaving?: boolean;
 };
 
 export type CostState = {
@@ -154,13 +157,16 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const SAVABLE_ITEMS = ['Rates', 'House Insurance', 'Exterior Maintenance', 'Lawns / Gardens', 'Building Insurance', 'Water Rates', 'Security'];
+    const SAVABLE_ITEMS = [
+        'Rates', 'House Insurance', 'Exterior Maintenance', 'Home Maintenance',
+        'Lawns / Gardens', 'Lawn/Garden', 'Lawn & Garden', 'Building Insurance', 'Water Rates', 'Security'
+    ];
 
     const totalCurrentCostsYearly = costs.currentCosts.reduce((sum, item) => sum + calculateYearly(item), 0);
 
-    // Derived Savings: Sum of current costs that match the Savable list
+    // Derived Savings: Sum of current costs that are marked as village savings or match the list
     const totalVillageSavingsYearly = costs.currentCosts
-        .filter(c => SAVABLE_ITEMS.includes(c.name))
+        .filter(c => c.isVillageSaving || SAVABLE_ITEMS.includes(c.name))
         .reduce((sum, item) => sum + calculateYearly(item), 0);
 
     return (
