@@ -20,7 +20,7 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
         totalVillageSavingsYearly,
         selectedPackage,
         weeklyVillageFee,
-        totalAddonCost
+        costs
     } = useCalculator();
 
     // Default to 'Leave It' (0) which corresponds to Min Spending ($2000/mo)
@@ -31,15 +31,17 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
     const isReady = totalAssets >= packageCost;
     const freedEquity = totalAssets - packageCost;
 
-    // 2. Longevity Calculation
+    // 2. Longevity Calculation (Initial)
     const person = userInfo.people[0];
-    const age = parseInt(person.currentAge) || 70; // Default 70 if missing
+    const age = parseInt(person.currentAge) || 70;
     const gender = person.gender;
-    const expectancy = gender === 'male' ? 85 : 88;
-    const yearsLeft = Math.max(expectancy - age, 5); // Min 5 years cap for math safety
+    const defaultExpectancy = gender === 'male' ? 85 : 88;
+    const defaultYears = Math.max(defaultExpectancy - age, 5);
+
+    // State for Dynamic Lifespan
+    const [projectedYears, setProjectedYears] = useState(defaultYears);
 
     // 3. Projections (Yearly Loop)
-
     // Helper: Calc One Item Annual Value
     const getAnnualValue = (item: AssetItem) => {
         const val = item.value;
@@ -54,17 +56,20 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
     };
 
     // Constant Annual Costs
-    const annualVillageCost = (weeklyVillageFee + totalAddonCost) * 52;
-    const adjustedCurrentCosts = totalCurrentCostsYearly - totalVillageSavingsYearly;
-    const totalAnnualCosts = adjustedCurrentCosts + annualVillageCost;
+    const annualVillageFee = weeklyVillageFee * 52;
+
+    // Living Costs
+    const annualLivingCosts = totalCurrentCostsYearly;
+    const annualSavings = totalVillageSavingsYearly;
+
+    const totalAnnualCosts = annualVillageFee + annualLivingCosts - annualSavings;
 
     // Loop through each year to calculate Net Flow
     let lifetimeNetFlow = 0;
     let lifetimeGrossIncome = 0;
 
-    for (let i = 1; i <= yearsLeft; i++) {
+    for (let i = 1; i <= projectedYears; i++) {
         // Calculate Income for Year i
-        // Include income if no duration set (lifetime) OR if duration >= i
         const yearIncome = assets
             .filter(a => a.type === 'income' && a.frequency !== 'lump_sum')
             .filter(a => a.duration === undefined || a.duration >= i)
@@ -83,7 +88,7 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
 
     // Constraints
     const MIN_MONTHLY_SPEND = 2000;
-    const minTotalSpend = MIN_MONTHLY_SPEND * 12 * yearsLeft;
+    const minTotalSpend = MIN_MONTHLY_SPEND * 12 * projectedYears;
 
     // Max Spend is capped at Liquid Pot (cannot spend the ORA refund while living there)
     const maxTotalSpend = Math.max(liquidPot, minTotalSpend);
@@ -94,7 +99,7 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
     const spendRange = Math.max(maxTotalSpend - minTotalSpend, 0);
     const currentTotalSpend = minTotalSpend + (spendRange * spendRatio);
 
-    const monthlySpend = Math.max(currentTotalSpend / yearsLeft / 12, 0);
+    const monthlySpend = Math.max(currentTotalSpend / projectedYears / 12, 0);
 
     // Legacy = The unspent liquid cash + The fixed refund
     const remainingLiquid = Math.max(liquidPot - currentTotalSpend, 0);
@@ -105,8 +110,7 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
     const progress = Math.min((totalWealth / (packageCost || 1)) * 100, 100);
 
     // Dynamic warning text for capital check
-    // Max possible per month using only liquid funds
-    const maxPossibleMonthly = Math.max((liquidPot / yearsLeft / 12), 0);
+    const maxPossibleMonthly = Math.max((liquidPot / projectedYears / 12), 0);
 
     // Config based on Verdict
     const verdictConfig = isReady ? {
@@ -174,26 +178,95 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
                     )}
                 </View>
 
-                {/* NEW: Expenses Breakdown */}
+                {/* NEW: Expenses Breakdown (Itemized Receipt) */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <Ionicons name="receipt" size={24} color="#e65100" />
-                        <Text style={styles.cardTitle}>Estimated Annual Costs</Text>
+                        <Text style={styles.cardTitle}>Annual Costs (Receipt)</Text>
                     </View>
 
-                    <View style={styles.expenseRow}>
-                        <Text style={styles.expenseLabel}>Village (Fee + Addons)</Text>
-                        <Text style={styles.expenseValue}>${annualVillageCost.toLocaleString()}</Text>
-                    </View>
-                    <View style={styles.expenseRow}>
-                        <Text style={styles.expenseLabel}>Personal (Food, etc.)</Text>
-                        <Text style={styles.expenseValue}>${adjustedCurrentCosts.toLocaleString()}</Text>
+                    {/* Detailed List */}
+                    <View style={styles.receiptList}>
+                        {/* Income Sources */}
+                        <View style={styles.receiptSection}>
+                            <Text style={styles.receiptSectionTitle}>Income Sources</Text>
+                            {assets
+                                .filter(a => a.type === 'income' && a.frequency !== 'lump_sum')
+                                .filter(a => a.duration === undefined || a.duration >= 1)
+                                .map((item, index) => {
+                                    const annualValue = getAnnualValue(item);
+                                    return (
+                                        <View key={item.id} style={styles.receiptRow}>
+                                            <Text style={styles.receiptLabel}>{item.name}</Text>
+                                            <Text style={styles.receiptValue}>${annualValue.toLocaleString()}</Text>
+                                        </View>
+                                    );
+                                })}
+                            {assets.filter(a => a.type === 'income' && a.frequency !== 'lump_sum').length === 0 && (
+                                <View style={styles.receiptRow}>
+                                    <Text style={styles.receiptLabel}>No regular income</Text>
+                                    <Text style={styles.receiptValue}>$0</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.separator} />
+
+                        {/* Village Costs */}
+                        <View style={styles.receiptSection}>
+                            <Text style={styles.receiptSectionTitle}>Village Costs</Text>
+                            <View style={styles.receiptRow}>
+                                <Text style={styles.receiptLabel}>Weekly Village Fee (x52)</Text>
+                                <Text style={styles.receiptValue}>${annualVillageFee.toLocaleString()}</Text>
+                            </View>
+                        </View>
+
+                        {/* Living Costs Breakdown */}
+                        <View style={styles.receiptSection}>
+                            <Text style={styles.receiptSectionTitle}>Living Costs</Text>
+                            {costs.currentCosts.map((item, index) => {
+                                const yearlyValue = item.value * (item.frequency === 'weekly' ? 52 : item.frequency === 'monthly' ? 12 : 1);
+                                return (
+                                    <View key={item.id} style={styles.receiptRow}>
+                                        <Text style={styles.receiptLabel}>{item.name}</Text>
+                                        <Text style={styles.receiptValue}>${yearlyValue.toLocaleString()}</Text>
+                                    </View>
+                                );
+                            })}
+                            {costs.currentCosts.length === 0 && (
+                                <View style={styles.receiptRow}>
+                                    <Text style={styles.receiptLabel}>No living costs entered</Text>
+                                    <Text style={styles.receiptValue}>$0</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Village Savings */}
+                        {annualSavings > 0 && (
+                            <>
+                                <View style={styles.separator} />
+                                <View style={styles.receiptSection}>
+                                    <Text style={styles.receiptSectionTitle}>Village Savings</Text>
+                                    {costs.currentCosts
+                                        .filter(c => c.isVillageSaving || ['Rates', 'House Insurance', 'Exterior Maintenance', 'Home Maintenance', 'Lawns / Gardens', 'Lawn/Garden', 'Lawn & Garden', 'Building Insurance', 'Water Rates', 'Security'].some(s => c.name.toLowerCase().includes(s.toLowerCase())))
+                                        .map((item, index) => {
+                                            const yearlyValue = item.value * (item.frequency === 'weekly' ? 52 : item.frequency === 'monthly' ? 12 : 1);
+                                            return (
+                                                <View key={item.id} style={[styles.receiptRow, styles.savingRow]}>
+                                                    <Text style={styles.savingLabel}>{item.name}</Text>
+                                                    <Text style={styles.savingValue}>-${yearlyValue.toLocaleString()}</Text>
+                                                </View>
+                                            );
+                                        })}
+                                </View>
+                            </>
+                        )}
                     </View>
 
                     <View style={styles.separator} />
 
                     <View style={styles.expenseTotalRow}>
-                        <Text style={styles.expenseTotalLabel}>Total Outgoing</Text>
+                        <Text style={styles.expenseTotalLabel}>Total Net Outgoing</Text>
                         <View style={{ alignItems: 'flex-end' }}>
                             <Text style={styles.expenseTotalValue}>${totalAnnualCosts.toLocaleString()} / yr</Text>
                             <Text style={styles.expenseTotalSub}>(${(totalAnnualCosts / 12).toLocaleString(undefined, { maximumFractionDigits: 0 })} / mo)</Text>
@@ -206,13 +279,29 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
                     <View style={styles.card}>
                         <View style={styles.cardHeader}>
                             <Ionicons name="hourglass" size={24} color="#7b1fa2" />
-                            <Text style={styles.cardTitle}>{yearsLeft} Year Projection</Text>
+                            <Text style={styles.cardTitle}>{projectedYears} Year Projection</Text>
                         </View>
                         <Text style={styles.descText}>
-                            Based on standard life expectancy for your age ({age}) and gender ({gender}), we've projected your finances for the next <Text style={{ fontWeight: 'bold' }}>{yearsLeft} years</Text>.
+                            Based on your age ({age}), we are projecting your finances to age <Text style={{ fontWeight: 'bold' }}>{age + projectedYears}</Text>.
                         </Text>
-                        <Text style={[styles.descText, { marginTop: 8, fontSize: 12, fontStyle: 'italic' }]}>
-                            Income streams with set durations will expire automatically in the calculation.
+
+                        <View style={styles.sliderContainer}>
+                            <Text style={styles.sliderLabel}>Term: {projectedYears} Years</Text>
+                            <Slider
+                                style={{ flex: 1, height: 40 }}
+                                minimumValue={5}
+                                maximumValue={40}
+                                step={1}
+                                value={projectedYears}
+                                onValueChange={setProjectedYears}
+                                minimumTrackTintColor="#7b1fa2"
+                                maximumTrackTintColor="#ccc"
+                                thumbTintColor="#7b1fa2"
+                            />
+                        </View>
+
+                        <Text style={[styles.descText, { marginTop: 0, fontSize: 12, fontStyle: 'italic', marginBottom: 20 }]}>
+                            Income streams with set durations will expire automatically.
                         </Text>
 
                         <View style={styles.separator} />
@@ -437,17 +526,17 @@ const styles = StyleSheet.create({
         borderTopColor: '#f9f9f9',
     },
     statLabel: {
-        fontSize: 16,
+        fontSize: 18,
         color: '#333',
     },
     statValue: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: 'bold',
     },
     descText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
-        lineHeight: 22,
+        lineHeight: 24,
     },
     separator: {
         height: 1,
@@ -455,13 +544,13 @@ const styles = StyleSheet.create({
         marginVertical: 20,
     },
     sliderTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '700',
         color: '#333',
         marginBottom: 4,
     },
     sliderSub: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#666',
         marginBottom: 16,
     },
@@ -472,7 +561,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     sliderLabel: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
         color: '#0a7ea4',
     },
@@ -493,22 +582,22 @@ const styles = StyleSheet.create({
         backgroundColor: '#e1e1e1',
     },
     projLabel: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#666',
         marginBottom: 4,
         textTransform: 'uppercase',
     },
     projValue: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: 'bold',
         color: '#333',
     },
     projSub: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#999',
     },
     note: {
-        fontSize: 11,
+        fontSize: 12,
         color: '#999',
         fontStyle: 'italic',
         marginTop: 16,
@@ -526,23 +615,57 @@ const styles = StyleSheet.create({
     },
     restartText: {
         color: '#0a7ea4',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '600',
     },
     // New Expense Styles
-    expenseRow: {
+    // Receipt Styles
+    receiptList: {
+        marginBottom: 16,
+        gap: 8,
+    },
+    receiptSection: {
+        marginBottom: 16,
+    },
+    receiptSectionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    receiptRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        alignItems: 'center',
+        paddingVertical: 4,
     },
-    expenseLabel: {
-        fontSize: 14,
+    receiptLabel: {
+        fontSize: 16,
         color: '#666',
     },
-    expenseValue: {
-        fontSize: 14,
+    receiptValue: {
+        fontSize: 16,
         fontWeight: '600',
         color: '#333',
+    },
+    savingRow: {
+        marginTop: 4,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+        borderStyle: 'dashed',
+    },
+    savingLabel: {
+        fontSize: 16,
+        color: '#2e7d32',
+        fontStyle: 'italic',
+    },
+    savingValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#2e7d32',
     },
     expenseTotalRow: {
         flexDirection: 'row',

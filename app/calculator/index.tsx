@@ -1,8 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// @ts-ignore
-import Peep, { Accessories, Body, Face, FacialHair, Hair } from 'react-native-peeps';
 import { AssetsStep } from '../../components/calculator/steps/AssetsStep';
 import { CostsStep } from '../../components/calculator/steps/CostsStep';
 import { NextStepsStep } from '../../components/calculator/steps/NextStepsStep';
@@ -37,14 +35,14 @@ export default function HorizontalJourney() {
     const [step, setStep] = useState(0);
     const progressAnim = useRef(new Animated.Value(0)).current;
 
-    const { userInfo } = useCalculator();
+    const { userInfo, markStepCompleted, isStepCompleted } = useCalculator();
     // Use Person 1 as the main avatar walker
     const avatar = userInfo.people[0];
 
     // Responsive Card Dimensions
     const isDesktop = width > 768;
     const cardWidth = isDesktop ? 600 : width * 0.85;
-    const cardHeight = isDesktop ? 700 : height * 0.70; // Slightly shorter to make room for path
+    const cardHeight = isDesktop ? 750 : height * 0.96; // Increased desktop height and mobile top space utilization
 
     // Snapping configuration
     const snapInterval = cardWidth + SPACING;
@@ -95,26 +93,36 @@ export default function HorizontalJourney() {
     const renderMiniAvatar = () => {
         if (!avatar) return null;
 
-        const hairComp = Hair[avatar.hair];
-        const faceComp = Face[avatar.face];
-        const bodyComp = Body[avatar.body];
+        const people = userInfo.people;
+        
+        if (people.length === 1) {
+            // Single avatar
+            return (
+                <View style={styles.miniAvatarRoot}>
+                    <View style={styles.miniEmojiContainer}>
+                        <Text style={styles.miniEmoji}>{avatar.avatar}</Text>
+                    </View>
+                </View>
+            );
+        } else if (people.length === 2) {
+            // Two avatars side by side with overlap
+            return (
+                <View style={styles.multiAvatarContainer}>
+                    <View style={[styles.miniAvatarRoot, { marginRight: -5 }]}>
+                        <View style={styles.miniEmojiContainer}>
+                            <Text style={styles.miniEmoji}>{people[0].avatar}</Text>
+                        </View>
+                    </View>
+                    <View style={[styles.miniAvatarRoot, { marginLeft: -15, zIndex: 1 }]}>
+                        <View style={styles.miniEmojiContainer}>
+                            <Text style={styles.miniEmoji}>{people[1].avatar}</Text>
+                        </View>
+                    </View>
+                </View>
+            );
+        }
 
-        const facialHairComp = avatar.facialHair !== 'None' ? FacialHair[avatar.facialHair] : undefined;
-        const accessoryComp = avatar.accessory !== 'None' ? Accessories[avatar.accessory] : undefined;
-
-        return (
-            <View style={styles.miniAvatarRoot}>
-                <Peep
-                    style={styles.miniPeep}
-                    hair={hairComp}
-                    face={faceComp}
-                    body={bodyComp}
-                    facialHair={facialHairComp}
-                    accessory={accessoryComp}
-                    viewBox={{ x: 0, y: 0, width: 850, height: 1200 }}
-                />
-            </View>
-        );
+        return null;
     };
 
     return (
@@ -139,7 +147,10 @@ export default function HorizontalJourney() {
                 }}
                 onScroll={onScroll}
                 scrollEventThrottle={16}
-                style={styles.scrollContainer}
+                style={[
+                    styles.scrollContainer,
+                    isDesktop && { marginTop: -60 } // Extra shift up for desktop
+                ]}
             >
                 {STEPS.map((Component, index) => (
                     <View
@@ -149,11 +160,15 @@ export default function HorizontalJourney() {
                             {
                                 width: cardWidth,
                                 height: cardHeight,
-                                marginRight: index === STEPS.length - 1 ? 0 : SPACING
+                                marginRight: index === STEPS.length - 1 ? 0 : SPACING,
+                                opacity: index > step + 1 ? 0.6 : 1, // Grey out future steps beyond next
                             }
                         ]}
                     >
-                        <View style={styles.glassCard}>
+                        <View style={[
+                            styles.glassCard,
+                            index > step + 1 && styles.upcomingCard
+                        ]}>
                             <Component
                                 onNext={next}
                                 onBack={back}
@@ -176,6 +191,7 @@ export default function HorizontalJourney() {
                             key={i}
                             style={[
                                 styles.milestoneDot,
+                                isStepCompleted(i) ? { backgroundColor: '#4caf50' } : 
                                 i <= step ? { backgroundColor: '#0a7ea4' } : { backgroundColor: '#ccc' }
                             ]}
                         />
@@ -203,6 +219,7 @@ const styles = StyleSheet.create({
     },
     scrollContainer: {
         flex: 1,
+        marginTop: -40, // Shift up to utilize top space
     },
     cardWrapper: {
         justifyContent: 'center',
@@ -220,6 +237,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.6)',
         padding: 24,
+    },
+    upcomingCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        borderColor: 'rgba(200,200,200,0.4)',
     },
     pathContainer: {
         position: 'absolute',
@@ -259,6 +280,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: -30,
     },
+    multiAvatarContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 60,
+        width: 90,
+        marginBottom: 4,
+        overflow: 'hidden',
+    },
     miniAvatarRoot: {
         alignItems: 'center',
         justifyContent: 'flex-end',
@@ -267,9 +297,29 @@ const styles = StyleSheet.create({
         marginBottom: 4,
         overflow: 'hidden' // Ensure it fits
     },
-    miniPeep: {
+    miniEmojiContainer: {
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'center',
         width: 60,
         height: 60,
+    },
+    miniEmoji: {
+        fontSize: 40,
+        fontWeight: 'bold',
+        transform: [{ scaleX: -1 }], // Flip horizontally to face opposite direction
+        position: 'absolute',
+        bottom: 5,
+    },
+    miniHairEmoji: {
+        fontSize: 30,
+        position: 'absolute',
+        top: 0,
+    },
+    miniAccessoryEmoji: {
+        fontSize: 20,
+        position: 'absolute',
+        top: 5,
     },
     avatarShadow: {
         width: 20,

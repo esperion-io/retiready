@@ -5,21 +5,25 @@ export type Person = {
     id: string;
     title: string;
     name: string;
-    gender: 'male' | 'female';
+    gender: 'male' | 'female' | 'neutral';
     currentAge: string;
-    // Avatar Props
-    // OpenPeeps Keys
-    body: string;
-    face: string;
-    hair: string;
-    facialHair: string;
-    accessory: string;
+    // Simple Animal Avatar
+    avatar: string;
 };
 
 export type UserInfo = {
-    people: Person[];
+    name: string;
+    region?: string;
+    people: Person[]; // Array of people (e.g. couple)
     goal: 'First Plan' | 'Update Plan' | 'Final Plan';
     avatar?: string; // Keep for fallback or overall theme if needed, but likely derived from Person 1 now
+    completedSteps: number[]; // Track which steps are completed
+};
+
+// Region-specific village fees (weekly)
+const REGION_VILLAGE_FEES: Record<string, number> = {
+    'North Island': 200,
+    'South Island': 160,
 };
 
 export type TabType = 'income' | 'savings' | 'assets';
@@ -54,12 +58,6 @@ export type PackageOption = {
     isManualCost: boolean;
 };
 
-export type AddonItem = {
-    id: string;
-    name: string;
-    cost: number;
-    selected: boolean;
-};
 
 interface CalculatorContextType {
     userInfo: UserInfo;
@@ -70,12 +68,11 @@ interface CalculatorContextType {
     setCosts: (costs: CostState) => void;
     selectedPackage: PackageOption | null;
     setSelectedPackage: (pkg: PackageOption | null) => void;
-
-    // Addons
-    addons: AddonItem[];
-    setAddons: (addons: AddonItem[]) => void;
     weeklyVillageFee: number;
-    totalAddonCost: number;
+
+    // Step completion helpers
+    markStepCompleted: (stepIndex: number) => void;
+    isStepCompleted: (stepIndex: number) => boolean;
 
     // Computed values helpers
     totalAssets: number;
@@ -88,17 +85,15 @@ const CalculatorContext = createContext<CalculatorContextType | undefined>(undef
 
 export function CalculatorProvider({ children }: { children: ReactNode }) {
     const [userInfo, setUserInfo] = useState<UserInfo>({
+        name: '',
+        completedSteps: [],
         people: [{
             id: '1',
-            title: 'Mr',
+            title: 'Mx',
             name: '',
-            gender: 'male',
+            gender: 'neutral',
             currentAge: '',
-            body: 'Geek',
-            face: 'Smile',
-            hair: 'Short',
-            facialHair: 'None',
-            accessory: 'None'
+            avatar: '🐶'
         }],
         goal: 'First Plan',
         avatar: 'adventurer'
@@ -114,18 +109,22 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
     const [selectedPackage, setSelectedPackage] = useState<PackageOption | null>(null);
 
 
-    // Default Addons
-    const [addons, setAddons] = useState<AddonItem[]>([
-        { id: '1', name: 'Car Park', cost: 20, selected: false },
-        { id: '2', name: 'Storage Unit', cost: 10, selected: false },
-        { id: '3', name: 'Sky TV', cost: 15, selected: false },
-        { id: '4', name: 'Internet', cost: 20, selected: false },
-        { id: '5', name: 'Cleaner', cost: 50, selected: false },
-        { id: '6', name: 'Meals', cost: 100, selected: false },
-    ]);
+    // Get region-specific village fee or default
+    const weeklyVillageFee = userInfo.region ? REGION_VILLAGE_FEES[userInfo.region] || 180 : 180;
 
-    const weeklyVillageFee = 180;
-    const totalAddonCost = addons.filter(a => a.selected).reduce((sum, a) => sum + a.cost, 0);
+    // Step completion helpers
+    const markStepCompleted = (stepIndex: number) => {
+        if (!userInfo.completedSteps.includes(stepIndex)) {
+            setUserInfo({
+                ...userInfo,
+                completedSteps: [...userInfo.completedSteps, stepIndex]
+            });
+        }
+    };
+
+    const isStepCompleted = (stepIndex: number) => {
+        return userInfo.completedSteps.includes(stepIndex);
+    };
 
     const totalAssets = assets
         .filter(a => a.type === 'asset' || a.type === 'savings' || a.frequency === 'lump_sum')
@@ -180,10 +179,9 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
                 setCosts,
                 selectedPackage,
                 setSelectedPackage,
-                addons,
-                setAddons,
                 weeklyVillageFee,
-                totalAddonCost,
+                markStepCompleted,
+                isStepCompleted,
                 totalAssets,
                 totalAnnualIncome,
                 totalCurrentCostsYearly,

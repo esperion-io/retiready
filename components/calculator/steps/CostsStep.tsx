@@ -4,6 +4,25 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput
 import { CostItem, useCalculator } from '../../../context/CalculatorContext';
 import { useToast } from '../../../context/ToastContext';
 
+// Utility function to format numbers with thousand separators
+const formatNumberWithCommas = (value: string): string => {
+    const cleanValue = value.replace(/[^0-9.]/g, '');
+    const parts = cleanValue.split('.');
+    let integerPart = parts[0];
+    const decimalPart = parts[1] ? '.' + parts[1] : '';
+    
+    if (integerPart) {
+        integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    
+    return integerPart + decimalPart;
+};
+
+// Utility function to parse formatted number back to plain number
+const parseFormattedNumber = (formattedValue: string): string => {
+    return formattedValue.replace(/,/g, '');
+};
+
 interface CostsStepProps {
     onNext: () => void;
     onBack: () => void;
@@ -32,8 +51,10 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
 
     // Inline Edit State
     const [editingItem, setEditingItem] = useState<{ name: string; isOther: boolean } | null>(null);
+    const [editId, setEditId] = useState<string | null>(null); // If set, we are editing this ID
     const [inputName, setInputName] = useState('');
     const [inputValue, setInputValue] = useState('');
+    const [formattedInputValue, setFormattedInputValue] = useState('');
     const [inputFreq, setInputFreq] = useState<CostItem['frequency']>('yearly');
 
     // Helper: Is this cost a village saving?
@@ -47,13 +68,28 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
 
     const startAdding = (name: string, isOther: boolean) => {
         setEditingItem({ name, isOther });
+        setEditId(null);
         setInputValue('');
+        setFormattedInputValue('');
         setInputName(isOther ? '' : name);
         setInputFreq('yearly');
     };
 
+    const startEditing = (item: CostItem) => {
+        const isOther = !COMMON_COST_OPTIONS.includes(item.name);
+        setEditingItem({ name: item.name, isOther });
+        setEditId(item.id);
+
+        setInputName(item.name);
+        const valueStr = item.value.toString();
+        setInputValue(valueStr);
+        setFormattedInputValue(formatNumberWithCommas(valueStr));
+        setInputFreq(item.frequency);
+    };
+
     const handleCancel = () => {
         setEditingItem(null);
+        setEditId(null);
     };
 
     const handleSave = () => {
@@ -68,16 +104,25 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
         }
 
         const newItem: CostItem = {
-            id: Date.now().toString(),
+            id: editId || Date.now().toString(),
             name: inputName,
             value: val,
             frequency: inputFreq,
             isVillageSaving: isVillageSaving(inputName)
         };
 
-        setCurrentCosts([...currentCosts, newItem]);
-        setEditingItem(null); // Return to grid
-        showToast('Cost added', 'success');
+        if (editId) {
+            // Update existing
+            setCurrentCosts(currentCosts.map(c => c.id === editId ? newItem : c));
+            showToast('Cost updated', 'success');
+        } else {
+            // Add new
+            setCurrentCosts([...currentCosts, newItem]);
+            showToast('Cost added', 'success');
+        }
+
+        setEditingItem(null);
+        setEditId(null);
     };
 
     const removeCost = (id: string) => {
@@ -97,17 +142,17 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                 <View style={{ width: 24 }} />
             </View>
 
+            {/* Static Summary Card */}
+            <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>Total Annual Costs</Text>
+                <Text style={styles.summaryValue}>${totalCurrentCostsYearly.toLocaleString()}</Text>
+            </View>
+
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
                 {/* 1. VIEW MODE */}
                 {!editingItem && (
                     <>
-                        {/* Summary Card */}
-                        <View style={styles.summaryCard}>
-                            <Text style={styles.summaryLabel}>Total Annual Costs</Text>
-                            <Text style={styles.summaryValue}>${totalCurrentCostsYearly.toLocaleString()}</Text>
-                        </View>
-
                         {/* Village Savings Highlight */}
                         {totalVillageSavingsYearly > 0 && (
                             <View style={styles.savingsCard}>
@@ -142,25 +187,36 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                             <View style={styles.listSection}>
                                 <Text style={styles.sectionTitle}>Your Items</Text>
                                 {currentCosts.map((item: CostItem) => (
-                                    <View key={item.id} style={styles.itemCard}>
-                                        <View style={{ flex: 1 }}>
-                                            <View style={styles.itemRow}>
-                                                <Text style={styles.itemName}>{item.name}</Text>
-                                                {item.isVillageSaving && (
-                                                    <View style={styles.savingBadge}>
-                                                        <Text style={styles.savingBadgeText}>Village Saving</Text>
-                                                    </View>
-                                                )}
+                                    <View key={item.id} style={styles.itemWrapper}>
+                                        <TouchableOpacity
+                                            style={styles.itemCard}
+                                            onPress={() => startEditing(item)}
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <View style={styles.itemRow}>
+                                                    <Text style={styles.itemName}>{item.name}</Text>
+                                                    {item.isVillageSaving && (
+                                                        <View style={styles.savingBadge}>
+                                                            <Text style={styles.savingBadgeText}>Village Saving</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                <Text style={styles.itemSub}>
+                                                    ${item.value.toLocaleString()} / {item.frequency}
+                                                </Text>
                                             </View>
-                                            <Text style={styles.itemSub}>
-                                                ${item.value.toLocaleString()} / {item.frequency}
-                                            </Text>
-                                        </View>
-                                        <TouchableOpacity onPress={() => removeCost(item.id)}>
-                                            <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                                            <TouchableOpacity onPress={() => removeCost(item.id)} style={styles.deleteBtn}>
+                                                <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                                            </TouchableOpacity>
                                         </TouchableOpacity>
                                     </View>
                                 ))}
+
+                                {/* Scroll Indicator */}
+                                <View style={styles.scrollIndicator}>
+                                    <Text style={styles.scrollText}>Scroll for more</Text>
+                                    <Ionicons name="chevron-down" size={20} color="#999" />
+                                </View>
                             </View>
                         )}
 
@@ -197,8 +253,12 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                                     style={styles.input}
                                     placeholder="0.00"
                                     keyboardType="numeric"
-                                    value={inputValue}
-                                    onChangeText={setInputValue}
+                                    value={formattedInputValue}
+                                    onChangeText={(text) => {
+                                        const formatted = formatNumberWithCommas(text);
+                                        setFormattedInputValue(formatted);
+                                        setInputValue(parseFormattedNumber(formatted));
+                                    }}
                                     autoFocus={!editingItem.isOther}
                                 />
                             </View>
@@ -333,6 +393,9 @@ const styles = StyleSheet.create({
     listSection: {
         marginTop: 32,
     },
+    itemWrapper: {
+        marginBottom: 12,
+    },
     itemCard: {
         backgroundColor: '#fff',
         padding: 16,
@@ -340,9 +403,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
         borderWidth: 1,
         borderColor: '#eee',
+    },
+    deleteBtn: {
+        padding: 8,
     },
     itemName: {
         fontSize: 16,
@@ -368,7 +433,7 @@ const styles = StyleSheet.create({
         borderColor: '#c8e6c9',
     },
     savingBadgeText: {
-        fontSize: 10,
+        fontSize: 12,
         color: '#2e7d32',
         fontWeight: '600',
     },
@@ -389,19 +454,29 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     savingsTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
         color: '#2e7d32',
     },
     savingsSub: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#4caf50',
     },
     savingsValue: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
         color: '#1b5e20',
-        marginLeft: 36,
+        marginTop: 2,
+    },
+    scrollIndicator: {
+        alignItems: 'center',
+        marginTop: 16,
+        opacity: 0.6,
+    },
+    scrollText: {
+        fontSize: 14,
+        color: '#999',
+        marginBottom: 4,
     },
     footer: {
         padding: 20,

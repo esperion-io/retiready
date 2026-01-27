@@ -12,16 +12,16 @@ export default function LandingScreen() {
         <View style={[styles.container, { paddingTop: insets.top }]}>
             <View style={styles.content}>
                 <View style={styles.header}>
-                    <Text style={styles.logo}>RetiReady</Text>
-                    <Text style={styles.tagline}>Future Living, Simplified.</Text>
+                    <Text style={styles.logo}>Next Chapter</Text>
+                    <Text style={styles.tagline}>Your Next Chapter, Simplified.</Text>
                 </View>
 
                 <View style={styles.card}>
                     <Ionicons name="calculator-outline" size={64} color="#0a7ea4" style={styles.icon} />
                     <Text style={styles.title}>Retirement Calculator</Text>
                     <Text style={styles.description}>
-                        Discover your financial readiness for retirement living.
-                        Analyze your assets, compare costs, and see how much equity you could free up.
+                        Discover your financial readiness for your next chapter.
+                        Analyze your assets, compare costs, and see how much equity you could free up for retirement living.
                     </Text>
 
                     <TouchableOpacity

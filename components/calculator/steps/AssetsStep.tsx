@@ -4,6 +4,25 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput
 import { AssetItem, TabType, useCalculator } from '../../../context/CalculatorContext';
 import { useToast } from '../../../context/ToastContext';
 
+// Utility function to format numbers with thousand separators
+const formatNumberWithCommas = (value: string): string => {
+    const cleanValue = value.replace(/[^0-9.]/g, '');
+    const parts = cleanValue.split('.');
+    let integerPart = parts[0];
+    const decimalPart = parts[1] ? '.' + parts[1] : '';
+    
+    if (integerPart) {
+        integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    
+    return integerPart + decimalPart;
+};
+
+// Utility function to parse formatted number back to plain number
+const parseFormattedNumber = (formattedValue: string): string => {
+    return formattedValue.replace(/,/g, '');
+};
+
 interface AssetsStepProps {
     onNext: () => void;
     onBack: () => void;
@@ -32,8 +51,10 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
 
     // Inline Edit State
     const [editingItem, setEditingItem] = useState<{ name: string; isOther: boolean } | null>(null);
+    const [editId, setEditId] = useState<string | null>(null); // If set, we are editing this ID
     const [inputName, setInputName] = useState(''); // Only for "Other"
     const [inputValue, setInputValue] = useState('');
+    const [formattedInputValue, setFormattedInputValue] = useState('');
     const [inputFreq, setInputFreq] = useState<AssetItem['frequency']>('yearly');
     const [inputDuration, setInputDuration] = useState(''); // Years remaining
 
@@ -48,14 +69,30 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
 
     const startAdding = (name: string, isOther: boolean) => {
         setEditingItem({ name, isOther });
+        setEditId(null);
         setInputValue('');
+        setFormattedInputValue('');
         setInputName(isOther ? '' : name);
         setInputFreq('yearly');
         setInputDuration('');
     };
 
+    const startEditing = (item: AssetItem) => {
+        const isOther = !currentList.includes(item.name);
+        setEditingItem({ name: item.name, isOther });
+        setEditId(item.id);
+
+        setInputName(isOther ? item.name : item.name); // If other, edit name. If not, just ensure stored.
+        const valueStr = item.value.toString();
+        setInputValue(valueStr);
+        setFormattedInputValue(formatNumberWithCommas(valueStr));
+        setInputFreq(item.frequency || 'yearly');
+        setInputDuration(item.duration ? item.duration.toString() : '');
+    };
+
     const handleCancel = () => {
         setEditingItem(null);
+        setEditId(null);
     };
 
     const handleSave = () => {
@@ -84,7 +121,7 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
         };
 
         const newItem: AssetItem = {
-            id: Date.now().toString(),
+            id: editId || Date.now().toString(),
             name: inputName,
             value: val,
             type: typeMap[activeTab],
@@ -92,9 +129,18 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
             duration: durationTerm
         };
 
-        setAssets([...assets, newItem]);
+        if (editId) {
+            // Update existing
+            setAssets(assets.map(a => a.id === editId ? newItem : a));
+            showToast('Item updated', 'success');
+        } else {
+            // Add new
+            setAssets([...assets, newItem]);
+            showToast('Item added', 'success');
+        }
+
         setEditingItem(null);
-        showToast('Item added', 'success');
+        setEditId(null);
     };
 
     const removeAsset = (id: string) => {
@@ -172,20 +218,31 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                             <View style={styles.listSection}>
                                 <Text style={styles.sectionTitle}>Your Items</Text>
                                 {tabItems.map(item => (
-                                    <View key={item.id} style={styles.itemCard}>
-                                        <View>
-                                            <Text style={styles.itemName}>{item.name}</Text>
-                                            <Text style={styles.itemSub}>
-                                                ${item.value.toLocaleString()}
-                                                {item.type === 'income' && item.frequency !== 'lump_sum' ? `/${item.frequency}` : ''}
-                                                {item.duration ? ` for ${item.duration} yr${item.duration > 1 ? 's' : ''}` : ''}
-                                            </Text>
-                                        </View>
-                                        <TouchableOpacity onPress={() => removeAsset(item.id)}>
-                                            <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                                    <View key={item.id} style={styles.itemWrapper}>
+                                        <TouchableOpacity
+                                            style={styles.itemCard}
+                                            onPress={() => startEditing(item)}
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.itemName}>{item.name}</Text>
+                                                <Text style={styles.itemSub}>
+                                                    ${item.value.toLocaleString()}
+                                                    {item.type === 'income' && item.frequency !== 'lump_sum' ? `/${item.frequency}` : ''}
+                                                    {item.duration ? ` for ${item.duration} yr${item.duration > 1 ? 's' : ''}` : ''}
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity onPress={() => removeAsset(item.id)} style={styles.deleteBtn}>
+                                                <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                                            </TouchableOpacity>
                                         </TouchableOpacity>
                                     </View>
                                 ))}
+
+                                {/* Scroll Indicator */}
+                                <View style={styles.scrollIndicator}>
+                                    <Text style={styles.scrollText}>Scroll for more</Text>
+                                    <Ionicons name="chevron-down" size={20} color="#999" />
+                                </View>
                             </View>
                         )}
                         <View style={{ height: 100 }} />
@@ -221,8 +278,12 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                                     style={styles.input}
                                     placeholder="0.00"
                                     keyboardType="numeric"
-                                    value={inputValue}
-                                    onChangeText={setInputValue}
+                                    value={formattedInputValue}
+                                    onChangeText={(text) => {
+                                        const formatted = formatNumberWithCommas(text);
+                                        setFormattedInputValue(formatted);
+                                        setInputValue(parseFormattedNumber(formatted));
+                                    }}
                                     autoFocus={!editingItem.isOther}
                                 />
                             </View>
@@ -393,6 +454,9 @@ const styles = StyleSheet.create({
     listSection: {
         marginTop: 32,
     },
+    itemWrapper: {
+        marginBottom: 12,
+    },
     itemCard: {
         backgroundColor: '#fff',
         padding: 16,
@@ -400,12 +464,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
         borderWidth: 1,
         borderColor: '#eee',
     },
+    deleteBtn: {
+        padding: 8,
+    },
     itemName: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '500',
         color: '#333',
     },
@@ -413,6 +479,16 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         marginTop: 2,
+    },
+    scrollIndicator: {
+        alignItems: 'center',
+        marginTop: 16,
+        opacity: 0.6,
+    },
+    scrollText: {
+        fontSize: 12,
+        color: '#999',
+        marginBottom: 4,
     },
     footer: {
         padding: 20,
@@ -431,7 +507,7 @@ const styles = StyleSheet.create({
     },
     nextButtonText: {
         color: '#fff',
-        fontSize: 18,
+        fontSize: 22,
         fontWeight: 'bold',
     },
 
@@ -455,7 +531,7 @@ const styles = StyleSheet.create({
         paddingBottom: 16,
     },
     cardTitle: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#333',
     },
@@ -463,7 +539,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     label: {
-        fontSize: 14,
+        fontSize: 18,
         fontWeight: '500',
         color: '#666',
         marginBottom: 8,
@@ -474,7 +550,7 @@ const styles = StyleSheet.create({
         borderColor: '#eee',
         borderRadius: 12,
         padding: 16,
-        fontSize: 16,
+        fontSize: 18,
     },
     freqRow: {
         flexDirection: 'row',
@@ -494,7 +570,7 @@ const styles = StyleSheet.create({
         borderColor: '#0a7ea4',
     },
     freqText: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
     },
     freqTextActive: {
@@ -515,7 +591,7 @@ const styles = StyleSheet.create({
     },
     cancelBtnText: {
         color: '#666',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '600',
     },
     saveBtn: {
@@ -527,7 +603,7 @@ const styles = StyleSheet.create({
     },
     saveBtnText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
     },
 });

@@ -14,7 +14,7 @@ const BASELINE_COSTS = {
 };
 
 export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
-    const { selectedPackage, setSelectedPackage, addons, setAddons, weeklyVillageFee } = useCalculator();
+    const { selectedPackage, setSelectedPackage, weeklyVillageFee } = useCalculator();
 
     const [type, setType] = useState<'villa' | 'apartment'>(selectedPackage?.type || 'villa');
     const [bedrooms, setBedrooms] = useState<1 | 2 | 3>(selectedPackage?.bedrooms || 2);
@@ -30,10 +30,6 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
             setSelectedPackage({ type, bedrooms, cost, isManualCost: isManual });
         }
     }, [type, bedrooms, isManual, manualCost]);
-
-    const toggleAddon = (id: string) => {
-        setAddons(addons.map(a => a.id === id ? { ...a, selected: !a.selected } : a));
-    };
 
     return (
         <View style={styles.container}>
@@ -107,6 +103,15 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                     )}
                 </View>
 
+                {/* Legal Fees Note */}
+                <View style={styles.legalFeesNote}>
+                    <Ionicons name="information-circle-outline" size={24} color="#e65100" />
+                    <View style={styles.legalFeesContent}>
+                        <Text style={styles.legalFeesTitle}>Important: Legal Fees</Text>
+                        <Text style={styles.legalFeesText}>This estimate does not include one-time legal fees (typically $2,000-$5,000) for conveyancing and documentation when moving into a retirement village.</Text>
+                    </View>
+                </View>
+
                 {/* Weekly Fee Section */}
                 <View style={styles.sectionHeaderRow}>
                     <Text style={styles.sectionHeader}>On-Going Costs</Text>
@@ -124,30 +129,6 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                         <Ionicons name="restaurant-outline" size={16} color="#e65100" />
                         <Text style={styles.feeNoteText}>Note: You will still need to purchase your own food.</Text>
                     </View>
-                </View>
-
-                {/* Addons Grid */}
-                <Text style={styles.sectionHeader}>Add-ons (Optional)</Text>
-                <Text style={styles.sectionSub}>Select any extra services you might need.</Text>
-
-                <View style={styles.grid}>
-                    {addons.map(addon => (
-                        <TouchableOpacity
-                            key={addon.id}
-                            style={[styles.addonCard, addon.selected && styles.addonActive]}
-                            onPress={() => toggleAddon(addon.id)}
-                        >
-                            <View style={styles.addonTop}>
-                                <Text style={[styles.addonName, addon.selected && styles.textActive]}>{addon.name}</Text>
-                                <Ionicons
-                                    name={addon.selected ? "checkbox" : "square-outline"}
-                                    size={24}
-                                    color={addon.selected ? "#fff" : "#ccc"}
-                                />
-                            </View>
-                            <Text style={[styles.addonCost, addon.selected && styles.textActive]}>+${addon.cost}/wk</Text>
-                        </TouchableOpacity>
-                    ))}
                 </View>
 
                 <View style={{ height: 40 }} />
@@ -292,17 +273,56 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#ddd',
     },
+    infoNote: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#f5f5f5',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 32,
+    },
+    infoNoteText: {
+        fontSize: 16,
+        color: '#666',
+        fontStyle: 'italic',
+    },
+    legalFeesNote: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        backgroundColor: '#fff3e0',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 32,
+        borderWidth: 1,
+        borderColor: '#ffcc02',
+    },
+    legalFeesContent: {
+        flex: 1,
+    },
+    legalFeesTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#e65100',
+        marginBottom: 4,
+    },
+    legalFeesText: {
+        fontSize: 14,
+        color: '#666',
+        lineHeight: 20,
+    },
     sectionHeaderRow: {
         marginBottom: 16,
     },
     sectionHeader: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '700',
         color: '#333',
         marginBottom: 4,
     },
     sectionSub: {
-        fontSize: 14,
+        fontSize: 16,
         color: '#666',
         marginBottom: 16,
     },
@@ -321,16 +341,16 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     feeLabel: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '600',
         color: '#0d47a1',
     },
     feeSub: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#1565c0',
     },
     feeValue: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
         color: '#0d47a1',
     },
@@ -343,46 +363,10 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     feeNoteText: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#e65100',
         fontStyle: 'italic',
         flex: 1,
-    },
-    grid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
-    addonCard: {
-        width: '48%',
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#eee',
-        marginBottom: 0,
-    },
-    addonActive: {
-        backgroundColor: '#0a7ea4',
-        borderColor: '#0a7ea4',
-    },
-    addonTop: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 24,
-    },
-    addonName: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-        flex: 1,
-        marginRight: 8,
-    },
-    addonCost: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#0a7ea4',
     },
     nextButton: {
         backgroundColor: '#0a7ea4',
