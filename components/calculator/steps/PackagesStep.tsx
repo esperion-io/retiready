@@ -14,22 +14,34 @@ const BASELINE_COSTS = {
 };
 
 export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
-    const { selectedPackage, setSelectedPackage, weeklyVillageFee } = useCalculator();
+    const { selectedPackage, setSelectedPackage, weeklyVillageFee, setResultsUnblurred } = useCalculator();
 
     const [type, setType] = useState<'villa' | 'apartment'>(selectedPackage?.type || 'villa');
     const [bedrooms, setBedrooms] = useState<1 | 2 | 3>(selectedPackage?.bedrooms || 2);
     const [isManual, setIsManual] = useState(selectedPackage?.isManualCost || false);
     const [manualCost, setManualCost] = useState(selectedPackage?.isManualCost ? selectedPackage.cost.toString() : '');
+    const [isManualFee, setIsManualFee] = useState(selectedPackage?.isManualFee || false);
+    const [manualFee, setManualFee] = useState(selectedPackage?.isManualFee && selectedPackage.weeklyFee ? selectedPackage.weeklyFee.toString() : '');
+
+    const [selectedCompany, setSelectedCompany] = useState('');
 
     const currentBaseline = BASELINE_COSTS[type][bedrooms];
     const displayCost = isManual && manualCost ? parseFloat(manualCost) : currentBaseline;
 
     useEffect(() => {
         const cost = isManual && manualCost ? parseFloat(manualCost) : currentBaseline;
+        const fee = isManualFee && manualFee ? parseFloat(manualFee) : undefined;
         if (!isNaN(cost)) {
-            setSelectedPackage({ type, bedrooms, cost, isManualCost: isManual });
+            setSelectedPackage({ 
+                type, 
+                bedrooms, 
+                cost, 
+                isManualCost: isManual,
+                weeklyFee: fee,
+                isManualFee: isManualFee
+            });
         }
-    }, [type, bedrooms, isManual, manualCost]);
+    }, [type, bedrooms, isManual, manualCost, isManualFee, manualFee]);
 
     return (
         <View style={styles.container}>
@@ -98,7 +110,6 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                             keyboardType="numeric"
                             value={manualCost}
                             onChangeText={setManualCost}
-                            placeholder="Enter Amount"
                         />
                     )}
                 </View>
@@ -109,6 +120,82 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                     <View style={styles.legalFeesContent}>
                         <Text style={styles.legalFeesTitle}>Important: Legal Fees</Text>
                         <Text style={styles.legalFeesText}>This estimate does not include one-time legal fees (typically $2,000-$5,000) for conveyancing and documentation when moving into a retirement village.</Text>
+                    </View>
+                </View>
+
+                {/* Retirement Company Selection */}
+                <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionHeader}>Preferred Retirement Company</Text>
+                </View>
+
+                <View style={styles.companyCard}>
+                    <Text style={styles.companyLabel}>Which retirement company are you most interested in?</Text>
+                    
+                    <View style={styles.companyGrid}>
+                        {[
+                            { 
+                                id: 'oceania', 
+                                name: 'Oceania Healthcare', 
+                                keyPoints: [
+                                    '• 12 months free weekly fees + $5,000 relocation',
+                                    '• 13 premium villages across Auckland/North Island',
+                                    '• Focus on luxury amenities & resort-style living'
+                                ]
+                            },
+                            { 
+                                id: 'ryman', 
+                                name: 'Ryman Healthcare', 
+                                keyPoints: [
+                                    '• No departure fees - 100% capital refund guarantee',
+                                    '• 40+ villages, largest NZ retirement operator',
+                                    '• Strong financial stability & dividend history'
+                                ]
+                            },
+                            { 
+                                id: 'summerset', 
+                                name: 'Summerset', 
+                                keyPoints: [
+                                    '• Fixed weekly fee increases (CPI + 2% max)',
+                                    '• Modern architect-designed villages',
+                                    '• Excellent care continuum independence to hospital care'
+                                ]
+                            },
+                            { 
+                                id: 'metlifecare', 
+                                name: 'Metlifecare', 
+                                keyPoints: [
+                                    '• Strong focus on wellness & active aging',
+                                    '• Premium locations with sea/city views',
+                                    '• Comprehensive health monitoring systems'
+                                ]
+                            },
+                            { 
+                                id: 'bupa', 
+                                name: 'Bupa Villages', 
+                                keyPoints: [
+                                    '• International backing with global healthcare expertise',
+                                    '• Flexible care options & aging-in-place support',
+                                    '• Competitive entry pricing & transparent fees'
+                                ]
+                            }
+                        ].map((company) => (
+                            <TouchableOpacity
+                                key={company.id}
+                                style={[styles.companyOption, selectedCompany === company.id && styles.companyOptionSelected]}
+                                onPress={() => setSelectedCompany(company.id)}
+                            >
+                                <Text style={[styles.companyName, selectedCompany === company.id && styles.companyNameSelected]}>
+                                    {company.name}
+                                </Text>
+                                <View style={styles.keyPoints}>
+                                    {company.keyPoints.map((point, index) => (
+                                        <Text key={index} style={[styles.keyPoint, selectedCompany === company.id && styles.keyPointSelected]}>
+                                            {point}
+                                        </Text>
+                                    ))}
+                                </View>
+                            </TouchableOpacity>
+                        ))}
                     </View>
                 </View>
 
@@ -125,6 +212,24 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                         </View>
                         <Text style={styles.feeValue}>${weeklyVillageFee}</Text>
                     </View>
+
+                    <View style={styles.manualRow}>
+                        <Text style={styles.manualLabel}>Enter custom weekly fee?</Text>
+                        <Switch
+                            value={isManualFee}
+                            onValueChange={setIsManualFee}
+                            trackColor={{ false: '#ddd', true: '#0a7ea4' }}
+                        />
+                    </View>
+                    {isManualFee && (
+                        <TextInput
+                            style={styles.manualInput}
+                            keyboardType="numeric"
+                            value={manualFee}
+                            onChangeText={setManualFee}
+                        />
+                    )}
+
                     <View style={styles.feeNote}>
                         <Ionicons name="restaurant-outline" size={16} color="#e65100" />
                         <Text style={styles.feeNoteText}>Note: You will still need to purchase your own food.</Text>
@@ -137,7 +242,10 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
 
             {/* Footer */}
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.nextButton} onPress={onNext}>
+                <TouchableOpacity style={styles.nextButton} onPress={() => {
+                    setResultsUnblurred(true);
+                    onNext();
+                }}>
                     <Text style={styles.nextButtonText}>Final Results</Text>
                     <Ionicons name="arrow-forward" size={20} color="#fff" />
                 </TouchableOpacity>
@@ -267,6 +375,7 @@ const styles = StyleSheet.create({
         width: '80%',
         backgroundColor: '#fff',
         padding: 12,
+        marginBottom: 10,
         borderRadius: 8,
         fontSize: 18,
         textAlign: 'center',
@@ -385,5 +494,64 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
+    },
+    // Company Selection Styles
+    companyCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 20,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+    },
+    companyLabel: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 16,
+    },
+    companyGrid: {
+        gap: 12,
+    },
+    companyOption: {
+        backgroundColor: '#f8f9fa',
+        borderWidth: 2,
+        borderColor: '#e0e0e0',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'flex-start',
+    },
+    companyOptionSelected: {
+        backgroundColor: '#e3f2fd',
+        borderColor: '#0a7ea4',
+    },
+    companyName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 4,
+    },
+    companyNameSelected: {
+        color: '#0a7ea4',
+    },
+    companyOffer: {
+        fontSize: 14,
+        color: '#666',
+        fontStyle: 'italic',
+    },
+    companyOfferSelected: {
+        color: '#1976d2',
+    },
+    keyPoints: {
+        marginTop: 8,
+    },
+    keyPoint: {
+        fontSize: 12,
+        color: '#666',
+        marginBottom: 2,
+        lineHeight: 16,
+    },
+    keyPointSelected: {
+        color: '#1565c0',
     },
 });

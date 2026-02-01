@@ -22,8 +22,8 @@ export type UserInfo = {
 
 // Region-specific village fees (weekly)
 const REGION_VILLAGE_FEES: Record<string, number> = {
-    'North Island': 200,
-    'South Island': 160,
+    'Yes': 220,    // Auckland - more expensive
+    'No': 180,     // Outside Auckland - less expensive
 };
 
 export type TabType = 'income' | 'savings' | 'assets';
@@ -56,6 +56,8 @@ export type PackageOption = {
     bedrooms: 1 | 2 | 3;
     cost: number;
     isManualCost: boolean;
+    weeklyFee?: number;
+    isManualFee?: boolean;
 };
 
 
@@ -69,6 +71,8 @@ interface CalculatorContextType {
     selectedPackage: PackageOption | null;
     setSelectedPackage: (pkg: PackageOption | null) => void;
     weeklyVillageFee: number;
+    resultsUnblurred: boolean;
+    setResultsUnblurred: (unblurred: boolean) => void;
 
     // Step completion helpers
     markStepCompleted: (stepIndex: number) => void;
@@ -108,9 +112,13 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
 
     const [selectedPackage, setSelectedPackage] = useState<PackageOption | null>(null);
 
+    const [resultsUnblurred, setResultsUnblurred] = useState(false);
 
-    // Get region-specific village fee or default
-    const weeklyVillageFee = userInfo.region ? REGION_VILLAGE_FEES[userInfo.region] || 180 : 180;
+
+    // Get region-specific village fee or default, or use manual fee if provided
+    const weeklyVillageFee = selectedPackage?.isManualFee && selectedPackage?.weeklyFee 
+        ? selectedPackage.weeklyFee 
+        : userInfo.region ? REGION_VILLAGE_FEES[userInfo.region] || 180 : 180;
 
     // Step completion helpers
     const markStepCompleted = (stepIndex: number) => {
@@ -180,6 +188,8 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
                 selectedPackage,
                 setSelectedPackage,
                 weeklyVillageFee,
+                resultsUnblurred,
+                setResultsUnblurred,
                 markStepCompleted,
                 isStepCompleted,
                 totalAssets,

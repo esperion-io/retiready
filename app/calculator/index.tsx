@@ -5,6 +5,7 @@ import { AssetsStep } from '../../components/calculator/steps/AssetsStep';
 import { CostsStep } from '../../components/calculator/steps/CostsStep';
 import { NextStepsStep } from '../../components/calculator/steps/NextStepsStep';
 import { PackagesStep } from '../../components/calculator/steps/PackagesStep';
+import { PromotionsStep } from '../../components/calculator/steps/PromotionsStep';
 import { ResultsStep } from '../../components/calculator/steps/ResultsStep';
 import { UserInfoStep } from '../../components/calculator/steps/UserInfoStep';
 import { useCalculator } from '../../context/CalculatorContext';
@@ -15,7 +16,8 @@ const STEPS = [
     CostsStep,
     PackagesStep,
     ResultsStep,
-    NextStepsStep
+    NextStepsStep,
+    PromotionsStep
 ];
 
 const BACKGROUNDS = [
@@ -24,6 +26,7 @@ const BACKGROUNDS = [
     '#fff3e0', // Light Orange (Sunset)
     '#f3e5f5', // Light Purple (Twilight)
     '#e1f5fe', // Light Blue (End)
+    '#fce4ec', // Light Pink (Promotions)
 ];
 
 const SPACING = 20;
@@ -133,25 +136,25 @@ export default function HorizontalJourney() {
             {/* Background Layer */}
             <View style={[styles.backgroundLayer, { backgroundColor: BACKGROUNDS[step] || BACKGROUNDS[0] }]} />
 
-            <ScrollView
-                ref={scrollRef}
-                horizontal
-                pagingEnabled={false}
-                snapToInterval={snapInterval}
-                snapToAlignment="center"
-                decelerationRate="fast"
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                    paddingHorizontal: insetHorizontal,
-                    alignItems: 'center',
-                }}
-                onScroll={onScroll}
-                scrollEventThrottle={16}
-                style={[
-                    styles.scrollContainer,
-                    isDesktop && { marginTop: -60 } // Extra shift up for desktop
-                ]}
-            >
+            <View style={styles.scrollContainer}>
+                <ScrollView
+                    ref={scrollRef}
+                    horizontal
+                    pagingEnabled={false}
+                    snapToInterval={snapInterval}
+                    snapToAlignment="center"
+                    decelerationRate="fast"
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{
+                        paddingHorizontal: insetHorizontal,
+                        alignItems: 'center',
+                    }}
+                    onScroll={onScroll}
+                    scrollEventThrottle={16}
+                    style={[
+                        isDesktop && { marginTop: -60 } // Extra shift up for desktop
+                    ]}
+                >
                 {STEPS.map((Component, index) => (
                     <View
                         key={index}
@@ -178,6 +181,7 @@ export default function HorizontalJourney() {
                     </View>
                 ))}
             </ScrollView>
+            </View>
 
             {/* Walking Path Footer */}
             <View style={[styles.pathContainer, { paddingBottom: insets.bottom + 10 }]}>
@@ -219,7 +223,7 @@ const styles = StyleSheet.create({
     },
     scrollContainer: {
         flex: 1,
-        marginTop: -40, // Shift up to utilize top space
+        marginTop: 20, // Restore proper margin above cards
     },
     cardWrapper: {
         justifyContent: 'center',

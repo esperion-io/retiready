@@ -191,7 +191,7 @@ export function UserInfoStep({ onNext }: UserInfoStepProps) {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Who Are You?</Text>
+                <Text style={styles.headerTitle}>Create Profile</Text>
             </View>
 
             {/* Person Switcher */}
@@ -243,7 +243,6 @@ export function UserInfoStep({ onNext }: UserInfoStepProps) {
                             <Text style={styles.inputLabel}>First Name</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="E.g. John"
                                 value={activePerson.name}
                                 onChangeText={(t) => updatePerson(activePerson.id, 'name', t)}
                             />
@@ -253,7 +252,6 @@ export function UserInfoStep({ onNext }: UserInfoStepProps) {
                             <Text style={styles.inputLabel}>Age</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Enter Age"
                                 keyboardType="numeric"
                                 value={formattedAge}
                                 onChangeText={(text) => {
@@ -265,22 +263,22 @@ export function UserInfoStep({ onNext }: UserInfoStepProps) {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Region</Text>
+                            <Text style={styles.inputLabel}>Do you live in Auckland?</Text>
                             <View style={styles.regionGrid}>
-                                {['North Island', 'South Island'].map((region) => (
+                                {['Yes', 'No'].map((option) => (
                                     <TouchableOpacity
-                                        key={region}
+                                        key={option}
                                         style={[
                                             styles.regionChip,
-                                            userInfo.region === region && styles.regionChipActive
+                                            userInfo.region === option && styles.regionChipActive
                                         ]}
-                                        onPress={() => setUserInfo({ ...userInfo, region })}
+                                        onPress={() => setUserInfo({ ...userInfo, region: option })}
                                     >
                                         <Text style={[
                                             styles.regionText,
-                                            userInfo.region === region && styles.regionTextActive
+                                            userInfo.region === option && styles.regionTextActive
                                         ]}>
-                                            {region}
+                                            {option}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
@@ -337,7 +335,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#333',
         textAlign: 'center',
@@ -487,6 +485,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 10,
+        marginTop: 8,
     },
     regionChip: {
         paddingVertical: 10,

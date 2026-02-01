@@ -31,7 +31,7 @@ interface CostsStepProps {
 const COMMON_COST_OPTIONS = [
     'Rates', 'House Insurance', 'Contents Insurance', 'Electricity / Gas',
     'Internet / Phone', 'Food & Groceries', 'Transport & Petrol',
-    'Medical & Health', 'Lawn & Garden', 'Home Maintenance'
+    'Medical & Health', 'Travel', 'Lawn & Garden', 'Home Maintenance'
 ];
 
 export function CostsStep({ onNext, onBack }: CostsStepProps) {
@@ -103,26 +103,32 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
             return;
         }
 
-        const newItem: CostItem = {
-            id: editId || Date.now().toString(),
-            name: inputName,
-            value: val,
-            frequency: inputFreq,
-            isVillageSaving: isVillageSaving(inputName)
-        };
-
         if (editId) {
             // Update existing
-            setCurrentCosts(currentCosts.map(c => c.id === editId ? newItem : c));
-            showToast('Cost updated', 'success');
+            setCurrentCosts(currentCosts.map(c => c.id === editId ? {
+                ...c,
+                name: inputName,
+                value: val,
+                frequency: inputFreq
+            } : c));
         } else {
             // Add new
+            const newItem: CostItem = {
+                id: Date.now().toString(),
+                name: inputName,
+                value: val,
+                frequency: inputFreq,
+                isVillageSaving: false
+            };
             setCurrentCosts([...currentCosts, newItem]);
-            showToast('Cost added', 'success');
         }
 
-        setEditingItem(null);
-        setEditId(null);
+        handleCancel();
+    };
+
+    // Check if a cost item has been added
+    const hasCostAdded = (itemName: string) => {
+        return currentCosts.some(item => item.name === itemName);
     };
 
     const removeCost = (id: string) => {
@@ -169,14 +175,34 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
 
                         {/* Grid */}
                         <View style={styles.grid}>
-                            {COMMON_COST_OPTIONS.map(name => (
-                                <TouchableOpacity key={name} style={styles.gridBtn} onPress={() => startAdding(name, false)}>
-                                    <Text style={styles.gridBtnText}>{name}</Text>
-                                    <Ionicons name="add-circle" size={24} color="#0a7ea4" />
-                                </TouchableOpacity>
-                            ))}
+                            {COMMON_COST_OPTIONS.map(name => {
+                                const isAdded = hasCostAdded(name);
+                                return (
+                                    <TouchableOpacity 
+                                        key={name} 
+                                        style={[
+                                            styles.gridBtn, 
+                                            isAdded && styles.gridBtnAdded,
+                                            Platform.OS === 'web' && { width: '48%' } // 2-column on web
+                                        ]} 
+                                        onPress={() => startAdding(name, false)}
+                                    >
+                                        <Text style={[
+                                            styles.gridBtnText,
+                                            isAdded && styles.gridBtnTextAdded
+                                        ]}>
+                                            {name}
+                                        </Text>
+                                        <Ionicons 
+                                            name={isAdded ? "checkmark-circle" : "add-circle"} 
+                                            size={24} 
+                                            color={isAdded ? "#fff" : "#0a7ea4"} 
+                                        />
+                                    </TouchableOpacity>
+                                );
+                            })}
                             {/* Other */}
-                            <TouchableOpacity style={[styles.gridBtn, styles.otherBtn]} onPress={() => startAdding('Other', true)}>
+                            <TouchableOpacity style={[styles.gridBtn, styles.otherBtn, Platform.OS === 'web' && { width: '48%' }]} onPress={() => startAdding('Other', true)}>
                                 <Text style={[styles.gridBtnText, { color: '#fff' }]}>Other</Text>
                                 <Ionicons name="add" size={24} color="#fff" />
                             </TouchableOpacity>
@@ -185,7 +211,7 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                         {/* Lists */}
                         {currentCosts.length > 0 && (
                             <View style={styles.listSection}>
-                                <Text style={styles.sectionTitle}>Your Items</Text>
+                                <Text style={styles.sectionTitle}>Overview (Click Item To Edit)</Text>
                                 {currentCosts.map((item: CostItem) => (
                                     <View key={item.id} style={styles.itemWrapper}>
                                         <TouchableOpacity
@@ -212,11 +238,6 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                                     </View>
                                 ))}
 
-                                {/* Scroll Indicator */}
-                                <View style={styles.scrollIndicator}>
-                                    <Text style={styles.scrollText}>Scroll for more</Text>
-                                    <Ionicons name="chevron-down" size={20} color="#999" />
-                                </View>
                             </View>
                         )}
 
@@ -239,7 +260,6 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                                     <Text style={styles.label}>Name</Text>
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="E.g. Netflix"
                                         value={inputName}
                                         onChangeText={setInputName}
                                         autoFocus
@@ -251,7 +271,6 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                                 <Text style={styles.label}>Cost ($)</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="0.00"
                                     keyboardType="numeric"
                                     value={formattedInputValue}
                                     onChangeText={(text) => {
@@ -367,7 +386,7 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     gridBtn: {
-        width: '48%',
+        width: '100%', // Full width on mobile
         backgroundColor: '#fff',
         padding: 16,
         borderRadius: 12,
@@ -382,13 +401,22 @@ const styles = StyleSheet.create({
         shadowRadius: 2,
     },
     otherBtn: {
-        backgroundColor: '#666',
-        borderColor: '#666',
+        backgroundColor: '#0a7ea4',
+        borderColor: '#0a7ea4',
     },
     gridBtnText: {
         fontSize: 14,
         fontWeight: '500',
         color: '#333',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    gridBtnAdded: {
+        backgroundColor: '#4caf50',
+        borderColor: '#4caf50',
+    },
+    gridBtnTextAdded: {
+        color: '#fff',
     },
     listSection: {
         marginTop: 32,
@@ -438,7 +466,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     savingsCard: {
-        marginTop: -10,
+        marginTop: 5,
         marginBottom: 24,
         backgroundColor: '#e8f5e9',
         padding: 20,
@@ -467,16 +495,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#1b5e20',
         marginTop: 2,
-    },
-    scrollIndicator: {
-        alignItems: 'center',
-        marginTop: 16,
-        opacity: 0.6,
-    },
-    scrollText: {
-        fontSize: 14,
-        color: '#999',
-        marginBottom: 4,
     },
     footer: {
         padding: 20,

@@ -38,16 +38,16 @@ export function NextStepsStep({ onRestart, onBack }: NextStepsStepProps) {
 
     const handleSendEmail = () => {
         if (!email.trim() || !email.includes('@')) {
-            showToast('Please enter a valid email', 'error');
+            showToast('Please enter a valid email address', 'error');
             return;
         }
 
         setSending(true);
-        // Simulate API call
+        // Simulate sending
         setTimeout(() => {
-            setSending(false);
-            showToast('Report sent successfully!', 'success');
+            showToast('Plan sent successfully!', 'success');
             setEmail('');
+            setSending(false);
         }, 1500);
     };
 
@@ -87,7 +87,6 @@ export function NextStepsStep({ onRestart, onBack }: NextStepsStepProps) {
                     <View style={styles.emailRow}>
                         <TextInput
                             style={styles.emailInput}
-                            placeholder="Enter your email"
                             value={email}
                             onChangeText={setEmail}
                             keyboardType="email-address"
@@ -98,11 +97,7 @@ export function NextStepsStep({ onRestart, onBack }: NextStepsStepProps) {
                             onPress={handleSendEmail}
                             disabled={sending}
                         >
-                            {sending ? (
-                                <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
-                            ) : (
-                                <Text style={styles.sendBtnText}>Send</Text>
-                            )}
+                            <Ionicons name="send" size={20} color="#fff" />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -110,42 +105,26 @@ export function NextStepsStep({ onRestart, onBack }: NextStepsStepProps) {
                 {/* Resources Section */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
-                        <Ionicons name="library" size={24} color="#7b1fa2" />
+                        <Ionicons name="library" size={24} color="#0a7ea4" />
                         <Text style={styles.cardTitle}>Helpful Resources</Text>
                     </View>
                     <Text style={styles.cardDesc}>
-                        Trusted advisory services to help you make informed decisions.
+                        Explore these trusted resources for retirement planning and village information.
                     </Text>
 
                     <View style={styles.resourceList}>
                         {RESOURCES.map((resource, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={[styles.resourceItem, index !== RESOURCES.length - 1 && styles.borderBottom]}
-                                onPress={() => openLink(resource.url)}
-                            >
-                                <View style={{ flex: 1 }}>
+                            <View key={index} style={[styles.resourceItem, index < RESOURCES.length - 1 && styles.borderBottom]}>
+                                <View style={{ flex: 1, paddingRight: 16 }}>
                                     <Text style={styles.resTitle}>{resource.title}</Text>
                                     <Text style={styles.resDesc}>{resource.desc}</Text>
                                 </View>
-                                <Ionicons name="open-outline" size={20} color="#0a7ea4" />
-                            </TouchableOpacity>
+                                <TouchableOpacity style={styles.callBtn} onPress={() => openLink(resource.url)}>
+                                    <Text style={styles.callBtnText}>Visit</Text>
+                                </TouchableOpacity>
+                            </View>
                         ))}
                     </View>
-                </View>
-
-                {/* Talk to Human */}
-                <View style={[styles.card, { backgroundColor: '#e3f2fd', borderColor: '#90caf9' }]}>
-                    <View style={styles.cardHeader}>
-                        <Ionicons name="call" size={24} color="#1565c0" />
-                        <Text style={[styles.cardTitle, { color: '#0d47a1' }]}>Talk to an Expert</Text>
-                    </View>
-                    <Text style={[styles.cardDesc, { color: '#1565c0' }]}>
-                        Our village specialists are available to answer your questions.
-                    </Text>
-                    <TouchableOpacity style={styles.callBtn} onPress={() => openLink('tel:0800123456')}>
-                        <Text style={styles.callBtnText}>Call 0800 123 456</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <View style={{ height: 40 }} />
@@ -186,18 +165,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     introText: {
-        fontSize: 16,
-        color: '#666',
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+        textAlign: 'center',
         marginBottom: 24,
-        lineHeight: 24,
+        paddingHorizontal: 20,
     },
     card: {
         backgroundColor: '#fff',
         borderRadius: 16,
         padding: 20,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#eee',
+        marginBottom: 20,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
@@ -228,27 +207,22 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f9f9f9',
         borderWidth: 1,
-        borderColor: '#eee',
-        borderRadius: 12,
+        borderColor: '#ddd',
+        borderRadius: 8,
         paddingHorizontal: 16,
+        paddingVertical: 12,
         fontSize: 16,
-        height: 50,
     },
     sendBtn: {
         backgroundColor: '#0a7ea4',
-        paddingHorizontal: 24,
-        borderRadius: 12,
-        justifyContent: 'center',
+        width: 48,
+        height: 48,
+        borderRadius: 8,
         alignItems: 'center',
-        height: 50,
+        justifyContent: 'center',
     },
     sendBtnDisabled: {
         backgroundColor: '#ccc',
-    },
-    sendBtnText: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 16,
     },
     resourceList: {
         gap: 16,
@@ -298,12 +272,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 16,
         gap: 8,
+        paddingVertical: 12,
     },
     restartText: {
-        color: '#666',
         fontSize: 16,
+        color: '#666',
         fontWeight: '600',
     },
 });

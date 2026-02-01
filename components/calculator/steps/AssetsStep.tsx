@@ -67,6 +67,37 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
         }
     }, [activeTab]);
 
+    // Determine next step button text and action based on active tab
+    const getNextStepConfig = () => {
+        switch (activeTab) {
+            case 'income':
+                return {
+                    text: 'Enter Savings',
+                    action: () => setActiveTab('savings')
+                };
+            case 'savings':
+                return {
+                    text: 'Enter Assets',
+                    action: () => setActiveTab('assets')
+                };
+            case 'assets':
+                return {
+                    text: 'Next Step',
+                    action: onNext
+                };
+            default:
+                return {
+                    text: 'Next Step',
+                    action: onNext
+                };
+        }
+    };
+
+    // Check if an item has been added for the current tab
+    const hasItemAdded = (itemName: string) => {
+        return tabItems.some(item => item.name === itemName);
+    };
+
     const startAdding = (name: string, isOther: boolean) => {
         setEditingItem({ name, isOther });
         setEditId(null);
@@ -200,23 +231,43 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                     <>
                         {/* Top 7 Grid */}
                         <View style={styles.grid}>
-                            {currentList.map(name => (
-                                <TouchableOpacity key={name} style={styles.gridBtn} onPress={() => startAdding(name, false)}>
-                                    <Text style={styles.gridBtnText}>{name}</Text>
-                                    <Ionicons name="add-circle" size={20} color="#0a7ea4" />
-                                </TouchableOpacity>
-                            ))}
+                            {currentList.map(name => {
+                                const isAdded = hasItemAdded(name);
+                                return (
+                                    <TouchableOpacity 
+                                        key={name} 
+                                        style={[
+                                            styles.gridBtn, 
+                                            isAdded && styles.gridBtnAdded,
+                                            Platform.OS === 'web' && { width: '48%' } // 2-column on web
+                                        ]} 
+                                        onPress={() => startAdding(name, false)}
+                                    >
+                                        <Text style={[
+                                            styles.gridBtnText,
+                                            isAdded && styles.gridBtnTextAdded
+                                        ]}>
+                                            {name}
+                                        </Text>
+                                        <Ionicons 
+                                            name={isAdded ? "checkmark-circle" : "add-circle"} 
+                                            size={24} 
+                                            color={isAdded ? "#fff" : "#0a7ea4"} 
+                                        />
+                                    </TouchableOpacity>
+                                );
+                            })}
                             {/* 8th Option: Other */}
-                            <TouchableOpacity style={[styles.gridBtn, styles.otherBtn]} onPress={() => startAdding('Other', true)}>
+                            <TouchableOpacity style={[styles.gridBtn, styles.otherBtn, Platform.OS === 'web' && { width: '48%' }]} onPress={() => startAdding('Other', true)}>
                                 <Text style={[styles.gridBtnText, { color: '#fff' }]}>Other</Text>
-                                <Ionicons name="add" size={20} color="#fff" />
+                                <Ionicons name="add" size={24} color="#fff" />
                             </TouchableOpacity>
                         </View>
 
                         {/* List of Added Items */}
                         {tabItems.length > 0 && (
                             <View style={styles.listSection}>
-                                <Text style={styles.sectionTitle}>Your Items</Text>
+                                <Text style={styles.sectionTitle}>Overview (Click Item To Edit)</Text>
                                 {tabItems.map(item => (
                                     <View key={item.id} style={styles.itemWrapper}>
                                         <TouchableOpacity
@@ -238,11 +289,6 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                                     </View>
                                 ))}
 
-                                {/* Scroll Indicator */}
-                                <View style={styles.scrollIndicator}>
-                                    <Text style={styles.scrollText}>Scroll for more</Text>
-                                    <Ionicons name="chevron-down" size={20} color="#999" />
-                                </View>
                             </View>
                         )}
                         <View style={{ height: 100 }} />
@@ -264,7 +310,6 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                                     <Text style={styles.label}>Name</Text>
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="E.g. BitCoin"
                                         value={inputName}
                                         onChangeText={setInputName}
                                         autoFocus
@@ -276,7 +321,6 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                                 <Text style={styles.label}>Value ($)</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="0.00"
                                     keyboardType="numeric"
                                     value={formattedInputValue}
                                     onChangeText={(text) => {
@@ -308,10 +352,9 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Years Remaining (Optional)</Text>
+                                        <Text style={styles.label}>Years Remaining (Best Guess)</Text>
                                         <TextInput
                                             style={styles.input}
-                                            placeholder="E.g. 5 (Leave blank for lifetime)"
                                             keyboardType="numeric"
                                             value={inputDuration}
                                             onChangeText={setInputDuration}
@@ -337,8 +380,8 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
             {/* Footer only visible if not editing (or we can keep it, but it might distract) */}
             {!editingItem && (
                 <View style={styles.footer}>
-                    <TouchableOpacity style={styles.nextButton} onPress={onNext}>
-                        <Text style={styles.nextButtonText}>Next Step</Text>
+                    <TouchableOpacity style={styles.nextButton} onPress={getNextStepConfig().action}>
+                        <Text style={styles.nextButtonText}>{getNextStepConfig().text}</Text>
                         <Ionicons name="arrow-forward" size={20} color="#fff" />
                     </TouchableOpacity>
                 </View>
@@ -428,7 +471,7 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     gridBtn: {
-        width: '48%',
+        width: '100%', // Full width on mobile
         backgroundColor: '#fff',
         padding: 16,
         borderRadius: 12,
@@ -442,14 +485,22 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 2,
     },
-    otherBtn: {
-        backgroundColor: '#666',
-        borderColor: '#666',
+    gridBtnAdded: {
+        backgroundColor: '#4caf50',
+        borderColor: '#4caf50',
     },
     gridBtnText: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
         color: '#333',
+        textAlign: 'center',
+    },
+    gridBtnTextAdded: {
+        color: '#fff',
+    },
+    otherBtn: {
+        backgroundColor: '#0a7ea4',
+        borderColor: '#0a7ea4',
     },
     listSection: {
         marginTop: 32,
@@ -479,16 +530,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         marginTop: 2,
-    },
-    scrollIndicator: {
-        alignItems: 'center',
-        marginTop: 16,
-        opacity: 0.6,
-    },
-    scrollText: {
-        fontSize: 12,
-        color: '#999',
-        marginBottom: 4,
     },
     footer: {
         padding: 20,

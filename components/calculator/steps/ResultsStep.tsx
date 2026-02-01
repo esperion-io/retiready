@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AssetItem, useCalculator } from '../../../context/CalculatorContext';
 
 interface ResultsStepProps {
@@ -11,25 +11,36 @@ interface ResultsStepProps {
 }
 
 export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
-    const {
-        userInfo,
-        assets,
-        totalAssets,
-        // totalAnnualIncome, // We will calc manually per year 
-        totalCurrentCostsYearly,
-        totalVillageSavingsYearly,
-        selectedPackage,
-        weeklyVillageFee,
-        costs
-    } = useCalculator();
+    const { userInfo, assets, totalAssets, totalAnnualIncome, totalCurrentCostsYearly, totalVillageSavingsYearly, selectedPackage, weeklyVillageFee, costs, resultsUnblurred } = useCalculator();
+
+    // Animation values for blur effect
+    const [blurAnim] = useState(new Animated.Value(0));
+    const [overlayOpacityAnim] = useState(new Animated.Value(1));
+
+    // Animate blur removal when results are unblurred
+    useEffect(() => {
+        if (resultsUnblurred) {
+            // Animate blur removal with smoother transitions
+            Animated.parallel([
+                Animated.timing(blurAnim, {
+                    toValue: 1,
+                    duration: 2400,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(overlayOpacityAnim, {
+                    toValue: 0,
+                    duration: 1600,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [resultsUnblurred]);
 
     // Default to 'Leave It' (0) which corresponds to Min Spending ($2000/mo)
     const [spendRatio, setSpendRatio] = useState(0);
 
     // 1. Basic Readiness Logic
     const packageCost = selectedPackage?.cost || 0;
-    const isReady = totalAssets >= packageCost;
-    const freedEquity = totalAssets - packageCost;
 
     // 2. Longevity Calculation (Initial)
     const person = userInfo.people[0];
@@ -40,6 +51,9 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
 
     // State for Dynamic Lifespan
     const [projectedYears, setProjectedYears] = useState(defaultYears);
+
+    // 3. Readiness Logic (now with projectedYears available)
+    // Will be calculated after totalWealth is computed
 
     // 3. Projections (Yearly Loop)
     // Helper: Calc One Item Annual Value
@@ -81,7 +95,9 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
     }
 
     // Total Liquid Pot (Cash + Income - Costs)
-    const liquidPot = freedEquity + lifetimeNetFlow;
+    // Temporary freed equity calculation - will be recalculated later with totalWealth
+    const tempFreedEquity = totalAssets - packageCost;
+    const liquidPot = tempFreedEquity + lifetimeNetFlow;
 
     // Fixed Refund (Typical ORA - 70% of entry)
     const fixedRefund = packageCost * 0.70;
@@ -108,6 +124,10 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
     // Wealth = Assets + Lifetime Income
     const totalWealth = totalAssets + lifetimeGrossIncome;
     const progress = Math.min((totalWealth / (packageCost || 1)) * 100, 100);
+
+    // Readiness Logic - use totalWealth which includes assets + lifetime income
+    const isReady = totalWealth >= packageCost;
+    const freedEquity = totalWealth - packageCost;
 
     // Dynamic warning text for capital check
     const maxPossibleMonthly = Math.max((liquidPot / projectedYears / 12), 0);
@@ -141,6 +161,34 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Blur overlay when results are not unblurred */}
+                {!resultsUnblurred && (
+                    <Animated.View style={[styles.blurOverlay, { opacity: overlayOpacityAnim }]}>
+                        <View style={styles.blurMessage}>
+                            <Ionicons name="lock-closed" size={48} color="#666" />
+                            <Text style={styles.blurTitle}>Results Locked</Text>
+                            <Text style={styles.blurText}>Complete the living options selection to view your financial outlook</Text>
+                        </View>
+                    </Animated.View>
+                )}
+
+                <Animated.View style={!resultsUnblurred && [
+                    styles.blurredContent,
+                    {
+                        opacity: blurAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.1, 1],
+                        }),
+                        transform: [
+                            {
+                                scale: blurAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0.98, 1],
+                                }),
+                            },
+                        ],
+                    }
+                ]}>
 
                 {/* 1. Verdict Banner */}
                 <View style={[styles.verdictCard, { backgroundColor: verdictConfig.bg, borderColor: verdictConfig.color }]}>
@@ -306,8 +354,8 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
 
                         <View style={styles.separator} />
 
-                        <Text style={styles.sliderTitle}>Lifestyle vs. Legacy</Text>
-                        <Text style={styles.sliderSub}>Adjust spending vs. inheritance. (Floor: $2000/mo)</Text>
+                        <Text style={styles.sliderTitle}>Choose Your Monthly Spending</Text>
+                        <Text style={styles.sliderSub}>How much would you like to spend each month? (Minimum: $2,000)</Text>
 
                         <View style={styles.sliderContainer}>
                             <Text style={styles.sliderLabel}>Leave It</Text>
@@ -327,21 +375,17 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
 
                         <View style={styles.projectionRow}>
                             <View style={styles.projectionBox}>
-                                <Text style={styles.projLabel}>Available Funds</Text>
+                                <Text style={styles.projLabel}>Your Monthly Budget</Text>
                                 <Text style={styles.projValue}>${monthlySpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
-                                <Text style={styles.projSub}>/ month</Text>
+                                <Text style={styles.projSub}>per month</Text>
                             </View>
                             <View style={styles.verticalLine} />
                             <View style={styles.projectionBox}>
-                                <Text style={styles.projLabel}>Inheritance</Text>
+                                <Text style={styles.projLabel}>Left for Family</Text>
                                 <Text style={styles.projValue}>${(legacy / 1000).toFixed(0)}k</Text>
-                                <Text style={styles.projSub}>Estimated</Text>
+                                <Text style={styles.projSub}>estimated inheritance</Text>
                             </View>
                         </View>
-
-                        <Text style={styles.note}>
-                            *Inheritance = 70% Unit Refund + Any unspent liquid capital. "Spend It" drains your liquid capital but leaves the refund intact.
-                        </Text>
                     </View>
                 )}
 
@@ -374,14 +418,8 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
                 )}
 
                 <View style={{ height: 40 }} />
+                </Animated.View>
             </ScrollView>
-
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-                    <Text style={styles.primaryBtnText}>View Next Steps</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </TouchableOpacity>
-            </View>
         </View>
     );
 }
@@ -391,24 +429,6 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     // ... existing styles ...
-    primaryBtn: {
-        backgroundColor: '#0a7ea4',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        borderRadius: 30,
-        gap: 8,
-        shadowColor: "#0a7ea4",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-    },
-    primaryBtnText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -428,12 +448,6 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: 20,
-    },
-    footer: {
-        padding: 20,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#f0f0f0',
     },
     verdictCard: {
         flexDirection: 'row',
@@ -513,8 +527,9 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     barLabel: {
-        fontSize: 12,
-        color: '#666',
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
     },
     statRow: {
         flexDirection: 'row',
@@ -530,8 +545,9 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     statValue: {
-        fontSize: 20,
+        fontSize: 24,
         fontWeight: 'bold',
+        color: '#0a7ea4',
     },
     descText: {
         fontSize: 16,
@@ -588,20 +604,17 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     projValue: {
-        fontSize: 22,
+        fontSize: 26,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#0a7ea4',
+        backgroundColor: '#f0f7ff',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
     },
     projSub: {
         fontSize: 14,
         color: '#999',
-    },
-    note: {
-        fontSize: 12,
-        color: '#999',
-        fontStyle: 'italic',
-        marginTop: 16,
-        textAlign: 'center',
     },
     restartBtn: {
         flexDirection: 'row',
@@ -646,9 +659,13 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     receiptValue: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#0a7ea4',
+        backgroundColor: '#f0f7ff',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
     savingRow: {
         marginTop: 4,
@@ -686,5 +703,37 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#666',
         marginTop: 2,
+    },
+    blurOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        zIndex: 10,
+        alignItems: 'center',
+        paddingTop: 60,
+    },
+    blurMessage: {
+        alignItems: 'center',
+        paddingHorizontal: 40,
+    },
+    blurTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#333',
+        marginTop: 16,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    blurText: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 24,
+    },
+    blurredContent: {
+        opacity: 0.1,
     },
 });
