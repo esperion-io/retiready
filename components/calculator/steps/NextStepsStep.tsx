@@ -26,7 +26,7 @@ const RESOURCES = [
     },
     {
         title: 'Retirement Village Association',
-        desc: 'Industry body with helpful guides and code of practice.',
+        desc: 'Industry body with helpful guides and code of practise.',
         url: 'https://www.retirementvillages.org.nz/'
     }
 ];
@@ -84,6 +84,8 @@ export function NextStepsStep({ onRestart, onBack }: NextStepsStepProps) {
                         Receive a detailed PDF report of your financial outlook and living options directly to your inbox.
                     </Text>
 
+                    <Text style={styles.emailInstruction}>Enter your email below:</Text>
+
                     <View style={styles.emailRow}>
                         <TextInput
                             style={styles.emailInput}
@@ -91,6 +93,8 @@ export function NextStepsStep({ onRestart, onBack }: NextStepsStepProps) {
                             onChangeText={setEmail}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            placeholder="your.email@example.com"
+                            placeholderTextColor="#999"
                         />
                         <TouchableOpacity
                             style={[styles.sendBtn, sending && styles.sendBtnDisabled]}
@@ -198,6 +202,12 @@ const styles = StyleSheet.create({
         color: '#666',
         lineHeight: 20,
         marginBottom: 20,
+    },
+    emailInstruction: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 12,
     },
     emailRow: {
         flexDirection: 'row',

@@ -21,7 +21,7 @@ export default function LandingScreen() {
                     <Text style={styles.title}>Retirement Calculator</Text>
                     <Text style={styles.description}>
                         Discover your financial readiness for your next chapter.
-                        Analyze your assets, compare costs, and see how much equity you could free up for retirement living.
+                        Analyse your assets, compare costs, and see how much equity you could free up for retirement living.
                     </Text>
 
                     <TouchableOpacity
@@ -36,7 +36,7 @@ export default function LandingScreen() {
                 <View style={styles.features}>
                     <View style={styles.featureItem}>
                         <Ionicons name="cash-outline" size={24} color="#2e7d32" />
-                        <Text style={styles.featureText}>Analyze Assets</Text>
+                        <Text style={styles.featureText}>Analyse Assets</Text>
                     </View>
                     <View style={styles.featureItem}>
                         <Ionicons name="home-outline" size={24} color="#f57c00" />

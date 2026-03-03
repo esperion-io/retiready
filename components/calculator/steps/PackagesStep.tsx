@@ -114,13 +114,36 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                     )}
                 </View>
 
-                {/* Legal Fees Note */}
-                <View style={styles.legalFeesNote}>
-                    <Ionicons name="information-circle-outline" size={24} color="#e65100" />
-                    <View style={styles.legalFeesContent}>
-                        <Text style={styles.legalFeesTitle}>Important: Legal Fees</Text>
-                        <Text style={styles.legalFeesText}>This estimate does not include one-time legal fees (typically $2,000-$5,000) for conveyancing and documentation when moving into a retirement village.</Text>
+                {/* Weekly Fee Section */}
+                <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionHeader}>On-Going Costs</Text>
+                </View>
+
+                <View style={styles.feeCard}>
+                    <View style={styles.feeRow}>
+                        <View>
+                            <Text style={styles.feeLabel}>Weekly Village Fee</Text>
+                            <Text style={styles.feeSub}>Covers rates, insurance, maintenance</Text>
+                        </View>
+                        <Text style={styles.feeValue}>${weeklyVillageFee}</Text>
                     </View>
+
+                    <View style={styles.manualRow}>
+                        <Text style={styles.manualLabel}>Enter custom weekly fee?</Text>
+                        <Switch
+                            value={isManualFee}
+                            onValueChange={setIsManualFee}
+                            trackColor={{ false: '#ddd', true: '#0a7ea4' }}
+                        />
+                    </View>
+                    {isManualFee && (
+                        <TextInput
+                            style={styles.manualInput}
+                            keyboardType="numeric"
+                            value={manualFee}
+                            onChangeText={setManualFee}
+                        />
+                    )}
                 </View>
 
                 {/* Retirement Company Selection */}
@@ -177,6 +200,15 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                                     '• Flexible care options & aging-in-place support',
                                     '• Competitive entry pricing & transparent fees'
                                 ]
+                            },
+                            { 
+                                id: 'arvida', 
+                                name: 'Arvida', 
+                                keyPoints: [
+                                    '• Not-for-profit organisation with community focus',
+                                    '• Wide range of village sizes and locations',
+                                    '• Strong emphasis on wellness and lifestyle programs'
+                                ]
                             }
                         ].map((company) => (
                             <TouchableOpacity
@@ -199,43 +231,6 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                     </View>
                 </View>
 
-                {/* Weekly Fee Section */}
-                <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.sectionHeader}>On-Going Costs</Text>
-                </View>
-
-                <View style={styles.feeCard}>
-                    <View style={styles.feeRow}>
-                        <View>
-                            <Text style={styles.feeLabel}>Weekly Village Fee</Text>
-                            <Text style={styles.feeSub}>Covers rates, insurance, maintenance</Text>
-                        </View>
-                        <Text style={styles.feeValue}>${weeklyVillageFee}</Text>
-                    </View>
-
-                    <View style={styles.manualRow}>
-                        <Text style={styles.manualLabel}>Enter custom weekly fee?</Text>
-                        <Switch
-                            value={isManualFee}
-                            onValueChange={setIsManualFee}
-                            trackColor={{ false: '#ddd', true: '#0a7ea4' }}
-                        />
-                    </View>
-                    {isManualFee && (
-                        <TextInput
-                            style={styles.manualInput}
-                            keyboardType="numeric"
-                            value={manualFee}
-                            onChangeText={setManualFee}
-                        />
-                    )}
-
-                    <View style={styles.feeNote}>
-                        <Ionicons name="restaurant-outline" size={16} color="#e65100" />
-                        <Text style={styles.feeNoteText}>Note: You will still need to purchase your own food.</Text>
-                    </View>
-                </View>
-
                 <View style={{ height: 40 }} />
 
             </ScrollView>
@@ -246,7 +241,7 @@ export function PackagesStep({ onNext, onBack }: PackagesStepProps) {
                     setResultsUnblurred(true);
                     onNext();
                 }}>
-                    <Text style={styles.nextButtonText}>Final Results</Text>
+                    <Text style={styles.nextButtonText}>Unlock Financial Outlook</Text>
                     <Ionicons name="arrow-forward" size={20} color="#fff" />
                 </TouchableOpacity>
             </View>

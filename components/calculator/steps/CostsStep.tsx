@@ -211,7 +211,7 @@ export function CostsStep({ onNext, onBack }: CostsStepProps) {
                         {/* Lists */}
                         {currentCosts.length > 0 && (
                             <View style={styles.listSection}>
-                                <Text style={styles.sectionTitle}>Overview (Click Item To Edit)</Text>
+                                <Text style={styles.sectionTitle}>Overview (Click to edit)</Text>
                                 {currentCosts.map((item: CostItem) => (
                                     <View key={item.id} style={styles.itemWrapper}>
                                         <TouchableOpacity

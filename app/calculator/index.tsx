@@ -27,6 +27,7 @@ const BACKGROUNDS = [
     '#f3e5f5', // Light Purple (Twilight)
     '#e1f5fe', // Light Blue (End)
     '#fce4ec', // Light Pink (Promotions)
+    '#f1f8e9', // Light Lime (Final step)
 ];
 
 const SPACING = 20;
@@ -81,16 +82,27 @@ export default function HorizontalJourney() {
             setStep(index);
         }
 
-        // Animate Progress (0 to 1 based on total width)
-        const maxScroll = snapInterval * (STEPS.length - 1);
-        const progress = Math.min(Math.max(x / maxScroll, 0), 1);
+        // Calculate progress based on current step index, not scroll position
+        // This ensures avatar aligns perfectly with dots when pages are centered
+        const progress = index / (STEPS.length - 1);
         progressAnim.setValue(progress);
     };
 
-    // Interpolate avatar position
+    // Calculate exact dot positions for proper alignment
+    // Progress bar should be max 80% of screen width and centered
+    const maxBarWidth = Math.min(width * 0.8, width - 80);
+    const barStartX = (width - maxBarWidth) / 2;
+    const barEndX = barStartX + maxBarWidth;
+    
+    // Avatar should align with dots within the constrained bar width
+    // Account for avatar width (60px) so avatar center aligns with dot center
+    const dotStartX = barStartX - 25;
+    const dotEndX = barEndX - 35; // Subtract half avatar width (30px) to center on dot
+    
+    // Interpolate avatar position to align with dots
     const avatarLeft = progressAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [40, width - 80]
+        outputRange: [dotStartX, dotEndX]
     });
 
     const renderMiniAvatar = () => {
@@ -110,7 +122,7 @@ export default function HorizontalJourney() {
         } else if (people.length === 2) {
             // Two avatars side by side with overlap
             return (
-                <View style={styles.multiAvatarContainer}>
+                <View style={[styles.multiAvatarContainer, { marginLeft: -20 }]}>
                     <View style={[styles.miniAvatarRoot, { marginRight: -5 }]}>
                         <View style={styles.miniEmojiContainer}>
                             <Text style={styles.miniEmoji}>{people[0].avatar}</Text>
@@ -186,10 +198,18 @@ export default function HorizontalJourney() {
             {/* Walking Path Footer */}
             <View style={[styles.pathContainer, { paddingBottom: insets.bottom + 10 }]}>
                 {/* Visual Path Line */}
-                <View style={styles.pathLine} />
+                <View style={[styles.pathLine, { 
+                    left: barStartX, 
+                    right: width - barEndX,
+                    width: maxBarWidth 
+                }]} />
 
                 {/* Milestones */}
-                <View style={styles.milestones}>
+                <View style={[styles.milestones, { 
+                    left: barStartX, 
+                    right: width - barEndX,
+                    width: maxBarWidth 
+                }]}>
                     {STEPS.map((_, i) => (
                         <View
                             key={i}
@@ -258,8 +278,6 @@ const styles = StyleSheet.create({
     pathLine: {
         position: 'absolute',
         bottom: 40,
-        left: 40,
-        right: 40,
         height: 4,
         backgroundColor: 'rgba(255,255,255,0.5)',
         borderRadius: 2,
@@ -267,8 +285,6 @@ const styles = StyleSheet.create({
     milestones: {
         position: 'absolute',
         bottom: 37,
-        left: 40,
-        right: 40,
         flexDirection: 'row',
         justifyContent: 'space-between',
     },

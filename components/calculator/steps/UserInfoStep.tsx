@@ -29,6 +29,8 @@ const parseFormattedNumber = (formattedValue: string): string => {
 
 interface UserInfoStepProps {
     onNext: () => void;
+    onBack?: () => void;
+    onRestart?: () => void;
 }
 
 // Fun animal avatar options (filtered for compatibility)
@@ -59,8 +61,22 @@ export function UserInfoStep({ onNext }: UserInfoStepProps) {
     
     // State for formatted inputs
     const [formattedAge, setFormattedAge] = useState(() => 
-        formatNumberWithCommas(userInfo.people[0].currentAge || '')
+        userInfo.people[0].currentAge ? userInfo.people[0].currentAge.toString() : ''
     );
+
+    // Validation function that can be called from parent
+    const validateAndProceed = () => {
+        const invalidPerson = userInfo.people.find(p => !p.name || !p.name.trim() || !p.currentAge);
+        if (invalidPerson) {
+            const missingFields = [];
+            if (!invalidPerson.name || !invalidPerson.name.trim()) missingFields.push('name');
+            if (!invalidPerson.currentAge) missingFields.push('age');
+            
+            showToast(`Please enter ${missingFields.join(' and ')} for all people.`, 'error');
+            return false;
+        }
+        return true;
+    };
 
     const activePerson = userInfo.people.find(p => p.id === editingId) || userInfo.people[0];
 
@@ -68,11 +84,7 @@ export function UserInfoStep({ onNext }: UserInfoStepProps) {
     const allAnimals = useMemo(() => ANIMAL_AVATARS, []);
 
     const handleNext = () => {
-        const invalidPerson = userInfo.people.find(p => !p.name || !p.currentAge);
-        if (invalidPerson) {
-            showToast('Please enter name and age for all people.', 'error');
-            return;
-        }
+        if (!validateAndProceed()) return;
         // Assuming 'name' and 'region' are now part of the top-level userInfo object
         // and are managed elsewhere or are implicitly available.
         // For this component, we'll use the existing userInfo.name and userInfo.region if they exist.
@@ -240,7 +252,7 @@ export function UserInfoStep({ onNext }: UserInfoStepProps) {
                     {/* Right: Inputs */}
                     <View style={styles.inputsColumn}>
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>First Name</Text>
+                            <Text style={styles.inputLabel}>First Name <Text style={styles.required}>*</Text></Text>
                             <TextInput
                                 style={styles.input}
                                 value={activePerson.name}
@@ -249,7 +261,7 @@ export function UserInfoStep({ onNext }: UserInfoStepProps) {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Age</Text>
+                            <Text style={styles.inputLabel}>Age <Text style={styles.required}>*</Text></Text>
                             <TextInput
                                 style={styles.input}
                                 keyboardType="numeric"
@@ -446,6 +458,10 @@ const styles = StyleSheet.create({
         fontSize: 20,
         borderWidth: 1,
         borderColor: '#eee',
+    },
+    required: {
+        color: '#ff6b6b',
+        fontWeight: 'bold',
     },
     genderRow: {
         flexDirection: 'row',

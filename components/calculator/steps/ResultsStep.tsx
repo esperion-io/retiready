@@ -226,6 +226,19 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
                     )}
                 </View>
 
+                {!isReady && (
+                    <View style={styles.card}>
+                        <View style={styles.cardHeader}>
+                            <Ionicons name="build" size={24} color="#ff8f00" />
+                            <Text style={styles.cardTitle}>Gap Analysis</Text>
+                        </View>
+                        <Text style={styles.descText}>
+                            You are currently <Text style={{ fontWeight: 'bold' }}>${Math.abs(freedEquity).toLocaleString()}</Text> short of the entry cost.
+                            Consider freeing up more assets or exploring other village options.
+                        </Text>
+                    </View>
+                )}
+
                 {/* NEW: Expenses Breakdown (Itemized Receipt) */}
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
@@ -404,18 +417,24 @@ export function ResultsStep({ onRestart, onBack, onNext }: ResultsStepProps) {
                     </View>
                 )}
 
-                {!isReady && (
-                    <View style={styles.card}>
-                        <View style={styles.cardHeader}>
-                            <Ionicons name="build" size={24} color="#ff8f00" />
-                            <Text style={styles.cardTitle}>Gap Analysis</Text>
+                {/* Important Notes Section */}
+                <View style={styles.notesSection}>
+                    <View style={styles.noteItem}>
+                        <Ionicons name="information-circle-outline" size={24} color="#e65100" />
+                        <View style={styles.noteContent}>
+                            <Text style={styles.noteTitle}>Important: Legal Fees</Text>
+                            <Text style={styles.noteText}>This estimate does not include one-time legal fees (typically $2,000-$5,000) for conveyancing and documentation when moving into a retirement village.</Text>
                         </View>
-                        <Text style={styles.descText}>
-                            You are currently <Text style={{ fontWeight: 'bold' }}>${Math.abs(freedEquity).toLocaleString()}</Text> short of the entry cost.
-                            Consider freeing up more assets or exploring other village options.
-                        </Text>
                     </View>
-                )}
+                    
+                    <View style={styles.noteItem}>
+                        <Ionicons name="restaurant-outline" size={24} color="#e65100" />
+                        <View style={styles.noteContent}>
+                            <Text style={styles.noteTitle}>Food Expenses</Text>
+                            <Text style={styles.noteText}>Note: You will still need to purchase your own food. Weekly village fees typically cover maintenance, rates, and some services, but not personal food costs.</Text>
+                        </View>
+                    </View>
+                </View>
 
                 <View style={{ height: 40 }} />
                 </Animated.View>
@@ -735,5 +754,33 @@ const styles = StyleSheet.create({
     },
     blurredContent: {
         opacity: 0.1,
+    },
+    // Notes Section Styles
+    notesSection: {
+        marginTop: 20,
+        gap: 16,
+    },
+    noteItem: {
+        flexDirection: 'row',
+        backgroundColor: '#fff8e1',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#ffecb3',
+    },
+    noteContent: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    noteTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#e65100',
+        marginBottom: 4,
+    },
+    noteText: {
+        fontSize: 14,
+        color: '#666',
+        lineHeight: 20,
     },
 });

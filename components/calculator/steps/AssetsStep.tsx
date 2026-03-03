@@ -40,7 +40,7 @@ const TOP_7_SAVINGS = [
 
 const TOP_7_ASSETS = [
     'Family Home', 'Holiday Home', 'Rental Property', 'Vehicle',
-    'Boat/Caravan', 'Jewelry/Art', 'Collectibles'
+    'Boat/Caravan', 'Jewellery/Art', 'Collectibles'
 ];
 
 export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
@@ -267,7 +267,7 @@ export function AssetsStep({ onNext, onBack }: AssetsStepProps) {
                         {/* List of Added Items */}
                         {tabItems.length > 0 && (
                             <View style={styles.listSection}>
-                                <Text style={styles.sectionTitle}>Overview (Click Item To Edit)</Text>
+                                <Text style={styles.sectionTitle}>Overview (Click to edit)</Text>
                                 {tabItems.map(item => (
                                     <View key={item.id} style={styles.itemWrapper}>
                                         <TouchableOpacity
